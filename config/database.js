@@ -15,7 +15,9 @@ const pool = new Pool({
   acquireTimeoutMillis: 120000, // 2 minutos para adquirir conexão
   statement_timeout: 300000, // 5 minutos para queries
   query_timeout: 300000, // 5 minutos para queries
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+  ssl: (process.env.DB_SSL === 'true' || (process.env.NODE_ENV === 'production' && process.env.DB_SSL !== 'false'))
+    ? { rejectUnauthorized: false }
+    : false
 });
 
 // Event listeners para monitoramento
@@ -77,7 +79,7 @@ const initializeDatabase = async () => {
     const path = require('path');
     const schemaPath = path.join(__dirname, '..', 'database', 'schema.sql');
     const schema = fs.readFileSync(schemaPath, 'utf8');
-    
+
     await query(schema);
     console.log('✅ Banco de dados inicializado com sucesso');
     return true;
