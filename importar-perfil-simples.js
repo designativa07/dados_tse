@@ -1,0 +1,249 @@
+const fs = require('fs');
+const csv = require('csv-parser');
+const path = require('path');
+require('dotenv').config();
+
+const db = require('./config/database');
+
+/**
+ * Script simples baseado no método funcional
+ * Usa INSERT individual para evitar problemas de parâmetros
+ */
+
+async function importarPerfilEleitor(arquivoCsv, anoEleicao) {
+  console.log(`🚀 Iniciando importação do perfil do eleitor ${anoEleicao}...`);
+  console.log(`📁 Arquivo: ${arquivoCsv}`);
+  
+  // Verificar se a eleição existe
+  const eleicao = await db.query('SELECT id FROM eleicoes WHERE ano = $1', [anoEleicao]);
+  
+  if (eleicao.rows.length === 0) {
+    console.log(`⚠️  Eleição ${anoEleicao} não encontrada. Criando...`);
+    await db.query(
+      'INSERT INTO eleicoes (ano, tipo, descricao) VALUES ($1, $2, $3)',
+      [anoEleicao, 'Geral', `Eleição Geral ${anoEleicao}`]
+    );
+    console.log(`✅ Eleição ${anoEleicao} criada.`);
+  }
+  
+  const eleicaoId = eleicao.rows[0]?.id || (await db.query('SELECT id FROM eleicoes WHERE ano = $1', [anoEleicao])).rows[0].id;
+  
+  let registrosProcessados = 0;
+  let registrosInseridos = 0;
+  let registrosIgnorados = 0;
+  
+  console.log('📁 Iniciando leitura do arquivo CSV...');
+
+  // Processar CSV linha por linha
+  await new Promise((resolve, reject) => {
+    fs.createReadStream(arquivoCsv, { encoding: 'utf8' })
+      .pipe(csv({ 
+        separator: ';',
+        quote: '"',
+        escape: '"',
+        skipEmptyLines: true,
+        skipLinesWithError: true
+      }))
+      .on('data', async (data) => {
+        registrosProcessados++;
+        
+        try {
+          // Limpar e converter dados
+          const dados = {
+            dt_geracao: converterData(data.DT_GERACAO),
+            hh_geracao: limparValor(data.HH_GERACAO),
+            ano_eleicao: limparValor(data.ANO_ELEICAO, 'integer'),
+            sg_uf: limparValor(data.SG_UF),
+            cd_municipio: limparValor(data.CD_MUNICIPIO, 'integer'),
+            nm_municipio: limparValor(data.NM_MUNICIPIO),
+            nr_zona: limparValor(data.NR_ZONA, 'integer'),
+            nr_secao: limparValor(data.NR_SECAO, 'integer'),
+            nr_local_votacao: limparValor(data.NR_LOCAL_VOTACAO, 'integer'),
+            nm_local_votacao: limparValor(data.NM_LOCAL_VOTACAO),
+            cd_genero: limparValor(data.CD_GENERO, 'integer'),
+            ds_genero: limparValor(data.DS_GENERO),
+            cd_estado_civil: limparValor(data.CD_ESTADO_CIVIL, 'integer'),
+            ds_estado_civil: limparValor(data.DS_ESTADO_CIVIL),
+            cd_faixa_etaria: limparValor(data.CD_FAIXA_ETARIA, 'integer'),
+            ds_faixa_etaria: limparValor(data.DS_FAIXA_ETARIA),
+            cd_grau_escolaridade: limparValor(data.CD_GRAU_ESCOLARIDADE, 'integer'),
+            ds_grau_escolaridade: limparValor(data.DS_GRAU_ESCOLARIDADE),
+            cd_raca_cor: limparValor(data.CD_RACA_COR, 'integer'),
+            ds_raca_cor: limparValor(data.DS_RACA_COR),
+            cd_identidade_genero: limparValor(data.CD_IDENTIDADE_GENERO, 'integer'),
+            ds_identidade_genero: limparValor(data.DS_IDENTIDADE_GENERO),
+            cd_quilombola: limparValor(data.CD_QUILOMBOLA, 'integer'),
+            ds_quilombola: limparValor(data.DS_QUILOMBOLA),
+            cd_interprete_libras: limparValor(data.CD_INTERPRETE_LIBRAS, 'integer'),
+            ds_interprete_libras: limparValor(data.DS_INTERPRETE_LIBRAS),
+            tp_obrigatoriedade_voto: limparValor(data.TP_OBRIGATORIEDADE_VOTO),
+            qt_eleitores_perfil: limparValor(data.QT_ELEITORES_PERFIL, 'integer') || 0,
+            qt_eleitores_biometria: limparValor(data.QT_ELEITORES_BIOMETRIA, 'integer') || 0,
+            qt_eleitores_deficiencia: limparValor(data.QT_ELEITORES_DEFICIENCIA, 'integer') || 0,
+            qt_eleitores_inc_nm_social: limparValor(data.QT_ELEITORES_INC_NM_SOCIAL, 'integer') || 0
+          };
+
+          // Validação básica
+          if (!dados.cd_municipio || !dados.nr_zona || !dados.nr_secao || !dados.ano_eleicao) {
+            registrosIgnorados++;
+            return;
+          }
+
+          // Buscar municipio_id
+          const municipio = await db.query(
+            'SELECT id FROM municipios WHERE codigo = $1 AND sigla_uf = $2',
+            [dados.cd_municipio, dados.sg_uf]
+          );
+          
+          if (municipio.rows.length === 0) {
+            console.warn(`⚠️ Município não encontrado: ${dados.cd_municipio} - ${dados.nm_municipio}`);
+            registrosIgnorados++;
+            return;
+          }
+          
+          const municipioId = municipio.rows[0].id;
+          
+          // Inserir registro
+          await db.query(`
+            INSERT INTO perfil_eleitor_secao (
+              dt_geracao, hh_geracao, ano_eleicao, sg_uf, cd_municipio, nm_municipio,
+              nr_zona, nr_secao, nr_local_votacao, nm_local_votacao, cd_genero, ds_genero,
+              cd_estado_civil, ds_estado_civil, cd_faixa_etaria, ds_faixa_etaria,
+              cd_grau_escolaridade, ds_grau_escolaridade, cd_raca_cor, ds_raca_cor,
+              cd_identidade_genero, ds_identidade_genero, cd_quilombola, ds_quilombola,
+              cd_interprete_libras, ds_interprete_libras, tp_obrigatoriedade_voto,
+              qt_eleitores_perfil, qt_eleitores_biometria, qt_eleitores_deficiencia, qt_eleitores_inc_nm_social,
+              municipio_id, eleicao_id
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32)
+            ON CONFLICT (ano_eleicao, sg_uf, cd_municipio, nr_zona, nr_secao, cd_genero, cd_estado_civil, cd_faixa_etaria, cd_grau_escolaridade, cd_raca_cor) DO UPDATE SET
+              qt_eleitores_perfil = EXCLUDED.qt_eleitores_perfil,
+              qt_eleitores_biometria = EXCLUDED.qt_eleitores_biometria,
+              qt_eleitores_deficiencia = EXCLUDED.qt_eleitores_deficiencia,
+              qt_eleitores_inc_nm_social = EXCLUDED.qt_eleitores_inc_nm_social,
+              municipio_id = EXCLUDED.municipio_id
+          `, [
+            dados.dt_geracao, dados.hh_geracao, dados.ano_eleicao, dados.sg_uf, dados.cd_municipio,
+            dados.nm_municipio, dados.nr_zona, dados.nr_secao, dados.nr_local_votacao, dados.nm_local_votacao,
+            dados.cd_genero, dados.ds_genero, dados.cd_estado_civil, dados.ds_estado_civil, dados.cd_faixa_etaria,
+            dados.ds_faixa_etaria, dados.cd_grau_escolaridade, dados.ds_grau_escolaridade, dados.cd_raca_cor, dados.ds_raca_cor,
+            dados.cd_identidade_genero, dados.ds_identidade_genero, dados.cd_quilombola, dados.ds_quilombola,
+            dados.cd_interprete_libras, dados.ds_interprete_libras, dados.tp_obrigatoriedade_voto,
+            dados.qt_eleitores_perfil, dados.qt_eleitores_biometria, dados.qt_eleitores_deficiencia, dados.qt_eleitores_inc_nm_social,
+            municipioId, eleicaoId
+          ]);
+          
+          registrosInseridos++;
+          
+          // Log de progresso
+          if (registrosProcessados % 10000 === 0) {
+            console.log(`📊 Processados: ${registrosProcessados} | Inseridos: ${registrosInseridos} | Ignorados: ${registrosIgnorados}`);
+          }
+          
+        } catch (error) {
+          console.error(`❌ Erro na linha ${registrosProcessados}:`, error.message);
+          registrosIgnorados++;
+        }
+      })
+      .on('end', () => {
+        console.log(`✅ Leitura concluída: ${registrosProcessados} registros processados`);
+        resolve();
+      })
+      .on('error', reject);
+  });
+
+  return {
+    registrosProcessados,
+    registrosInseridos,
+    registrosIgnorados
+  };
+}
+
+function limparValor(valor, tipo = 'string') {
+  if (!valor || valor === '' || valor === 'null' || valor === 'undefined') {
+    return null;
+  }
+  
+  const valorLimpo = valor.toString().trim();
+  
+  if (tipo === 'integer') {
+    const num = parseInt(valorLimpo);
+    return isNaN(num) ? null : num;
+  }
+  
+  return valorLimpo;
+}
+
+function converterData(dataStr) {
+  if (!dataStr) return null;
+  
+  // Formato: DD/MM/YYYY
+  const partes = dataStr.split('/');
+  if (partes.length === 3) {
+    return `${partes[2]}-${partes[1].padStart(2, '0')}-${partes[0].padStart(2, '0')}`;
+  }
+  return null;
+}
+
+async function main() {
+  try {
+    console.log('🚀 Iniciando importação dos dados de perfil do eleitor...\n');
+    
+    // Testar conexão
+    const conectado = await db.testConnection();
+    if (!conectado) {
+      console.error('❌ Não foi possível conectar ao banco de dados');
+      return;
+    }
+    
+    // Verificar se a tabela existe
+    const tabelaExiste = await db.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'perfil_eleitor_secao'
+      );
+    `);
+    
+    if (!tabelaExiste.rows[0].exists) {
+      console.log('📋 Criando tabela perfil_eleitor_secao...');
+      const schema = fs.readFileSync('./database/perfil_eleitor_schema.sql', 'utf8');
+      await db.query(schema);
+      console.log('✅ Tabela criada com sucesso!');
+    }
+
+    // Importar dados de 2018
+    const arquivo2018 = './perfil_eleitor_secao_2018_SC/perfil_eleitor_secao_2018_SC.csv';
+    if (fs.existsSync(arquivo2018)) {
+      console.log('\n📊 Importando dados de 2018...');
+      const resultado2018 = await importarPerfilEleitor(arquivo2018, 2018);
+      console.log(`✅ 2018: ${resultado2018.registrosInseridos} registros inseridos`);
+    } else {
+      console.log('⚠️  Arquivo de 2018 não encontrado');
+    }
+
+    // Importar dados de 2022
+    const arquivo2022 = './perfil_eleitor_secao_2022_SC/perfil_eleitor_secao_2022_SC.csv';
+    if (fs.existsSync(arquivo2022)) {
+      console.log('\n📊 Importando dados de 2022...');
+      const resultado2022 = await importarPerfilEleitor(arquivo2022, 2022);
+      console.log(`✅ 2022: ${resultado2022.registrosInseridos} registros inseridos`);
+    } else {
+      console.log('⚠️  Arquivo de 2022 não encontrado');
+    }
+
+    console.log('\n🎉 Importação concluída com sucesso!');
+    
+  } catch (error) {
+    console.error('❌ Erro durante a importação:', error);
+  } finally {
+    await db.closePool();
+  }
+}
+
+// Executar se chamado diretamente
+if (require.main === module) {
+  main();
+}
+
+module.exports = { importarPerfilEleitor };

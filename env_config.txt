@@ -1,0 +1,20 @@
+# Configurações do Banco de Dados
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=dados_tse
+DB_USER=postgres
+DB_PASSWORD=postgres
+
+# Configurações do Servidor
+PORT=3000
+NODE_ENV=development
+FRONTEND_URL=http://localhost:3000
+
+# Configurações de Upload
+UPLOAD_MAX_SIZE=52428800
+UPLOAD_ALLOWED_TYPES=csv
+
+# Configurações de Segurança
+JWT_SECRET=seu_jwt_secret_aqui_altere_em_producao_123456789
+RATE_LIMIT_WINDOW=900000
+RATE_LIMIT_MAX=100

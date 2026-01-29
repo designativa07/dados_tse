@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Processador CSV TSE - Mapa de Calor</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .upload-section {
+            padding: 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #eee;
+        }
+        .file-input {
+            margin: 10px 0;
+            padding: 10px;
+            border: 2px dashed #667eea;
+            border-radius: 8px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .file-input:hover {
+            background: #f0f2ff;
+        }
+        .file-input input {
+            display: none;
+        }
+        .map-container {
+            position: relative;
+        }
+        #map {
+            height: 600px;
+            width: 100%;
+        }
+        .stats {
+            padding: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+        .stat-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            border-left: 4px solid #667eea;
+        }
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+        .stat-label {
+            color: #666;
+            margin-top: 5px;
+        }
+        .controls {
+            padding: 20px;
+            background: #f8f9fa;
+            border-top: 1px solid #eee;
+        }
+        .control-group {
+            margin-bottom: 15px;
+        }
+        .control-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .control-group select, .control-group input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .legend {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+        .legend h4 {
+            margin: 0 0 10px 0;
+            color: #333;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+            border-radius: 3px;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            color: #667eea;
+        }
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            display: none;
+        }
+        .success {
+            background: #e8f5e8;
+            color: #2e7d32;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🗳️ Processador CSV TSE - Mapa de Calor</h1>
+            <p>Carregue seu arquivo CSV do TSE para gerar um mapa de calor interativo</p>
+        </div>
+        
+        <div class="upload-section">
+            <div class="file-input" onclick="document.getElementById('csvFile').click()">
+                <input type="file" id="csvFile" accept=".csv" onchange="processarCSV()">
+                <p>📁 Clique aqui para selecionar seu arquivo CSV do TSE</p>
+                <small>Formatos suportados: .csv (separado por ponto e vírgula)</small>
+            </div>
+            
+            <div class="loading" id="loading">
+                <p>⏳ Processando dados...</p>
+            </div>
+            
+            <div class="error" id="error"></div>
+            <div class="success" id="success"></div>
+        </div>
+        
+        <div class="map-container">
+            <div id="map"></div>
+        </div>
+        
+        <div class="stats" id="stats" style="display: none;">
+            <div class="stat-card">
+                <div class="stat-number" id="total-municipios">0</div>
+                <div class="stat-label">Municípios</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="total-votos">0</div>
+                <div class="stat-label">Total de Votos</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="media-votos">0</div>
+                <div class="stat-label">Média por Município</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="maior-votos">0</div>
+                <div class="stat-label">Maior Número de Votos</div>
+            </div>
+        </div>
+        
+        <div class="controls" id="controls" style="display: none;">
+            <div class="control-group">
+                <label for="tipo-visualizacao">Tipo de Visualização:</label>
+                <select id="tipo-visualizacao">
+                    <option value="heatmap">Mapa de Calor</option>
+                    <option value="circulos">Círculos Proporcionais</option>
+                    <option value="ambos">Ambos</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label for="filtro-votos">Filtrar por Mínimo de Votos:</label>
+                <input type="range" id="filtro-votos" min="0" max="100" value="0">
+                <span id="filtro-valor">0</span> votos
+            </div>
+        </div>
+    </div>
+    
+    <div class="legend" id="legend" style="display: none;">
+        <h4>Legenda</h4>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #0000ff;"></div>
+            <span>Poucos votos</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #00ffff;"></div>
+            <span>Votos médios</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #00ff00;"></div>
+            <span>Muitos votos</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #ffff00;"></div>
+            <span>Votos altos</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #ff0000;"></div>
+            <span>Máximo de votos</span>
+        </div>
+    </div>
+
+    <script>
+        // Coordenadas dos municípios de SC
+        const coordenadasSC = {
+            'CRICIÚMA': [-28.6775, -49.3697],
+            'SÃO JOSÉ': [-27.6136, -48.6366],
+            'FLORIANÓPOLIS': [-27.5954, -48.5480],
+            'LAGES': [-27.8161, -50.3259],
+            'SÃO JOAQUIM': [-28.2939, -49.9317],
+            'VIDEIRA': [-27.0089, -51.1517],
+            'SÃO DOMINGOS': [-26.5581, -52.5317],
+            'INDAIAL': [-26.8989, -49.2317],
+            'SIDERÓPOLIS': [-28.5981, -49.4267],
+            'BALNEÁRIO CAMBORIÚ': [-26.9906, -48.6342],
+            'FRAIBURGO': [-27.0256, -50.8075],
+            'PORTO BELO': [-27.1567, -48.5450],
+            'OURO VERDE': [-26.6917, -52.3100],
+            'SCHROEDER': [-26.4117, -49.0733],
+            'ARARANGUÁ': [-28.9356, -49.4958]
+        };
+
+        // Variáveis globais
+        let mapa = null;
+        let dadosProcessados = [];
+        let heatmapLayer = null;
+        let circulosLayer = null;
+        let tipoVisualizacao = 'heatmap';
+
+        // Inicializar mapa
+        function inicializarMapa() {
+            if (mapa) {
+                mapa.remove();
+            }
+            
+            mapa = L.map('map').setView([-27.2423, -50.2189], 7);
+            
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(mapa);
+        }
+
+        // Processar arquivo CSV
+        function processarCSV() {
+            const fileInput = document.getElementById('csvFile');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                mostrarErro('Nenhum arquivo selecionado.');
+                return;
+            }
+
+            mostrarLoading(true);
+            esconderMensagens();
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const csv = e.target.result;
+                    const linhas = csv.split('\n');
+                    
+                    if (linhas.length < 2) {
+                        throw new Error('Arquivo CSV inválido ou vazio.');
+                    }
+
+                    // Processar cabeçalho
+                    const cabecalho = linhas[0].split(';').map(col => col.replace(/"/g, '').trim());
+                    
+                    // Encontrar índices das colunas necessárias
+                    const indiceMunicipio = cabecalho.indexOf('NM_MUNICIPIO');
+                    const indiceVotos = cabecalho.indexOf('QT_VOTOS');
+                    const indiceCandidato = cabecalho.indexOf('NM_VOTAVEL');
+                    const indiceCargo = cabecalho.indexOf('DS_CARGO');
+                    const indiceUF = cabecalho.indexOf('SG_UF');
+
+                    if (indiceMunicipio === -1 || indiceVotos === -1) {
+                        throw new Error('Colunas necessárias não encontradas no CSV.');
+                    }
+
+                    // Processar dados
+                    const dadosPorMunicipio = {};
+                    
+                    for (let i = 1; i < linhas.length; i++) {
+                        const linha = linhas[i].trim();
+                        if (!linha) continue;
+
+                        const colunas = linha.split(';');
+                        if (colunas.length < Math.max(indiceMunicipio, indiceVotos) + 1) continue;
+
+                        const municipio = colunas[indiceMunicipio].replace(/"/g, '').trim().toUpperCase();
+                        const votos = parseInt(colunas[indiceVotos].replace(/"/g, '').trim()) || 0;
+                        const candidato = indiceCandidato !== -1 ? colunas[indiceCandidato].replace(/"/g, '').trim() : 'N/A';
+                        const cargo = indiceCargo !== -1 ? colunas[indiceCargo].replace(/"/g, '').trim() : 'N/A';
+                        const uf = indiceUF !== -1 ? colunas[indiceUF].replace(/"/g, '').trim() : 'SC';
+
+                        if (municipio && votos > 0) {
+                            if (!dadosPorMunicipio[municipio]) {
+                                dadosPorMunicipio[municipio] = {
+                                    nome: municipio,
+                                    votos: 0,
+                                    candidato: candidato,
+                                    cargo: cargo,
+                                    uf: uf
+                                };
+                            }
+                            dadosPorMunicipio[municipio].votos += votos;
+                        }
+                    }
+
+                    // Converter para array e ordenar
+                    dadosProcessados = Object.values(dadosPorMunicipio)
+                        .filter(item => coordenadasSC[item.nome]) // Apenas municípios com coordenadas
+                        .sort((a, b) => b.votos - a.votos);
+
+                    if (dadosProcessados.length === 0) {
+                        throw new Error('Nenhum município válido encontrado nos dados.');
+                    }
+
+                    // Atualizar interface
+                    atualizarEstatisticas();
+                    atualizarVisualizacao();
+                    mostrarControles();
+                    mostrarSucesso(`Dados processados com sucesso! ${dadosProcessados.length} municípios encontrados.`);
+
+                } catch (error) {
+                    mostrarErro('Erro ao processar CSV: ' + error.message);
+                } finally {
+                    mostrarLoading(false);
+                }
+            };
+
+            reader.readAsText(file, 'UTF-8');
+        }
+
+        // Atualizar estatísticas
+        function atualizarEstatisticas() {
+            const totalVotos = dadosProcessados.reduce((sum, m) => sum + m.votos, 0);
+            const mediaVotos = Math.round(totalVotos / dadosProcessados.length);
+            const maiorVotos = Math.max(...dadosProcessados.map(m => m.votos));
+
+            document.getElementById('total-municipios').textContent = dadosProcessados.length;
+            document.getElementById('total-votos').textContent = totalVotos.toLocaleString();
+            document.getElementById('media-votos').textContent = mediaVotos;
+            document.getElementById('maior-votos').textContent = maiorVotos;
+            
+            document.getElementById('stats').style.display = 'grid';
+        }
+
+        // Atualizar visualização
+        function atualizarVisualizacao() {
+            if (!mapa) return;
+
+            // Limpar camadas existentes
+            if (heatmapLayer) {
+                mapa.removeLayer(heatmapLayer);
+                heatmapLayer = null;
+            }
+            if (circulosLayer) {
+                mapa.removeLayer(circulosLayer);
+                circulosLayer = null;
+            }
+
+            if (tipoVisualizacao === 'heatmap' || tipoVisualizacao === 'ambos') {
+                criarHeatmap();
+            }
+            
+            if (tipoVisualizacao === 'circulos' || tipoVisualizacao === 'ambos') {
+                criarCirculos();
+            }
+        }
+
+        // Criar mapa de calor
+        function criarHeatmap() {
+            const pontos = dadosProcessados.map(municipio => {
+                const coords = coordenadasSC[municipio.nome];
+                return [coords[0], coords[1], municipio.votos];
+            });
+
+            heatmapLayer = L.heatLayer(pontos, {
+                radius: 30,
+                blur: 20,
+                maxZoom: 18,
+                gradient: {
+                    0.4: 'blue',
+                    0.6: 'cyan',
+                    0.7: 'lime',
+                    0.8: 'yellow',
+                    1.0: 'red'
+                }
+            }).addTo(mapa);
+        }
+
+        // Criar círculos proporcionais
+        function criarCirculos() {
+            circulosLayer = L.layerGroup();
+
+            dadosProcessados.forEach(municipio => {
+                const coords = coordenadasSC[municipio.nome];
+                const raio = Math.max(8, Math.min(25, municipio.votos / 3));
+                
+                const circulo = L.circleMarker([coords[0], coords[1]], {
+                    radius: raio,
+                    fillColor: '#ff0000',
+                    color: '#ff0000',
+                    weight: 2,
+                    opacity: 0.8,
+                    fillOpacity: 0.6
+                });
+
+                circulo.bindPopup(`
+                    <b>${municipio.nome}</b><br>
+                    Votos: ${municipio.votos.toLocaleString()}<br>
+                    Candidato: ${municipio.candidato}<br>
+                    Cargo: ${municipio.cargo}
+                `);
+
+                circulosLayer.addLayer(circulo);
+            });
+
+            circulosLayer.addTo(mapa);
+        }
+
+        // Mostrar/ocultar loading
+        function mostrarLoading(mostrar) {
+            document.getElementById('loading').style.display = mostrar ? 'block' : 'none';
+        }
+
+        // Mostrar erro
+        function mostrarErro(mensagem) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = mensagem;
+            errorDiv.style.display = 'block';
+        }
+
+        // Mostrar sucesso
+        function mostrarSucesso(mensagem) {
+            const successDiv = document.getElementById('success');
+            successDiv.textContent = mensagem;
+            successDiv.style.display = 'block';
+        }
+
+        // Esconder mensagens
+        function esconderMensagens() {
+            document.getElementById('error').style.display = 'none';
+            document.getElementById('success').style.display = 'none';
+        }
+
+        // Mostrar controles
+        function mostrarControles() {
+            document.getElementById('controls').style.display = 'block';
+            document.getElementById('legend').style.display = 'block';
+        }
+
+        // Event listeners
+        document.getElementById('tipo-visualizacao').addEventListener('change', function() {
+            tipoVisualizacao = this.value;
+            atualizarVisualizacao();
+        });
+
+        document.getElementById('filtro-votos').addEventListener('input', function() {
+            const valor = parseInt(this.value);
+            document.getElementById('filtro-valor').textContent = valor;
+            // Implementar filtro se necessário
+        });
+
+        // Inicializar
+        inicializarMapa();
+    </script>
+</body>
+</html>

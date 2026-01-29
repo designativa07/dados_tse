@@ -1,0 +1,1118 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Análise Eleitoral TSE</title>
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗳️</text></svg>">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <i class="fas fa-vote-yea"></i>
+                    <h1>Sistema de Análise Eleitoral TSE</h1>
+                </div>
+                <nav class="nav">
+                    <button class="nav-btn active" data-tab="municipios">
+                        <i class="fas fa-city"></i>
+                        Municípios
+                    </button>
+                    <button class="nav-btn" data-tab="tabelas">
+                        <i class="fas fa-table"></i>
+                        Tabelas
+                    </button>
+                    <button class="nav-btn" data-tab="candidatos">
+                        <i class="fas fa-users"></i>
+                        Candidatos
+                    </button>
+                    <button class="nav-btn" data-tab="eleitor">
+                        <i class="fas fa-user-check"></i>
+                        Perfil do Eleitor
+                    </button>
+                    <button class="nav-btn" data-tab="mapas">
+                        <i class="fas fa-map"></i>
+                        Mapas
+                    </button>
+                    <button class="nav-btn" data-tab="relatorios">
+                        <i class="fas fa-chart-bar"></i>
+                        Relatórios
+                    </button>
+                    <button class="nav-btn" data-tab="regionais">
+                        <i class="fas fa-map-marked-alt"></i>
+                        Análise Regional
+                    </button>
+                    <button class="nav-btn" data-tab="ranking">
+                        <i class="fas fa-medal"></i>
+                        Ranking
+                    </button>
+                    <button class="nav-btn" data-tab="upload">
+                        <i class="fas fa-upload"></i>
+                        Upload CSV
+                    </button>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main">
+        <div class="container">
+
+            <!-- Municípios Tab -->
+            <div id="municipios" class="tab-content active">
+                <div class="municipios-header">
+                    <h2>Busca de Municípios</h2>
+                    <p>Encontre municípios e visualize todos os candidatos que receberam votos</p>
+                </div>
+
+                <!-- Filtros de Busca -->
+                <div class="municipios-controls">
+                    <div class="filters-section">
+                        <h3>Filtros de Busca</h3>
+                        <div class="filters-grid">
+                            <div class="control-group">
+                                <label for="municipios-eleicao">Eleição</label>
+                                <select id="municipios-eleicao">
+                                    <option value="">Todas as eleições</option>
+                                </select>
+                            </div>
+                            <div class="control-group">
+                                <label for="municipios-busca">Buscar Município</label>
+                                <div class="search-container">
+                                    <input type="text" id="municipios-busca" placeholder="Digite o nome do município..."
+                                        autocomplete="off">
+                                    <button class="btn btn-primary" onclick="buscarMunicipios()">
+                                        <i class="fas fa-search"></i>
+                                        Buscar
+                                    </button>
+                                </div>
+                                <small>Digite pelo menos 2 caracteres para iniciar a busca</small>
+                            </div>
+                            <div class="control-group">
+                                <label for="municipios-ordenar">Ordenar por</label>
+                                <select id="municipios-ordenar">
+                                    <option value="nome">Nome do Município</option>
+                                    <option value="total_candidatos">Número de Candidatos</option>
+                                    <option value="total_votos">Total de Votos</option>
+                                    <option value="total_eleicoes">Número de Eleições</option>
+                                </select>
+                            </div>
+                            <div class="control-group">
+                                <label for="municipios-ordem">Ordem</label>
+                                <select id="municipios-ordem">
+                                    <option value="ASC">Crescente</option>
+                                    <option value="DESC">Decrescente</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Estatísticas -->
+                    <div class="municipios-stats" id="municipios-stats" style="display: none;">
+                        <h3>Estatísticas da Busca</h3>
+                        <div class="stats-grid" id="municipios-stats-grid">
+                            <!-- Estatísticas serão inseridas aqui -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Resultados da Busca -->
+                <div class="municipios-results">
+                    <div class="loading" id="municipios-loading" style="display: none;">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        Buscando municípios...
+                    </div>
+
+                    <div class="no-data" id="municipios-no-data">
+                        <i class="fas fa-city"></i>
+                        <h3>Nenhuma busca realizada</h3>
+                        <p>Digite o nome de um município e clique em "Buscar" para visualizar os resultados</p>
+                    </div>
+
+                    <!-- Lista de Municípios -->
+                    <div class="municipios-list" id="municipios-list" style="display: none;">
+                        <!-- Municípios serão inseridos aqui -->
+                    </div>
+
+                    <!-- Paginação -->
+                    <div class="table-pagination" id="municipios-pagination" style="display: none;"></div>
+                </div>
+
+                <!-- Modal de Detalhes do Município -->
+                <div id="modal-municipio" class="modal">
+                    <div class="modal-content modal-large">
+                        <div class="modal-header">
+                            <h3 id="modal-municipio-titulo">Detalhes do Município</h3>
+                            <button class="modal-close" onclick="fecharModalMunicipio()">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <!-- Informações do Município -->
+                            <div class="municipio-info" id="municipio-info">
+                                <!-- Informações serão inseridas aqui -->
+                            </div>
+
+                            <!-- Filtros para Candidatos -->
+                            <div class="candidatos-filters">
+                                <h4>Filtrar Candidatos</h4>
+                                <div class="filters-row">
+                                    <div class="control-group">
+                                        <label for="modal-eleicao">Eleição</label>
+                                        <select id="modal-eleicao">
+                                            <option value="">Todas as eleições</option>
+                                        </select>
+                                    </div>
+                                    <div class="control-group">
+                                        <label for="modal-cargo">Cargo</label>
+                                        <select id="modal-cargo">
+                                            <option value="">Todos os cargos</option>
+                                        </select>
+                                    </div>
+                                    <div class="control-group">
+                                        <label for="modal-ordenar">Ordenar por</label>
+                                        <select id="modal-ordenar">
+                                            <option value="quantidade_votos">Votos</option>
+                                            <option value="candidato_nome">Nome</option>
+                                            <option value="cargo">Cargo</option>
+                                            <option value="numero">Número</option>
+                                        </select>
+                                    </div>
+                                    <div class="control-group">
+                                        <button class="btn btn-primary" onclick="carregarCandidatosMunicipio()">
+                                            <i class="fas fa-search"></i>
+                                            Filtrar
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Lista de Candidatos -->
+                            <div class="candidatos-container">
+                                <h4>Candidatos do Município</h4>
+                                <div class="loading" id="candidatos-loading" style="display: none;">
+                                    <i class="fas fa-spinner fa-spin"></i>
+                                    Carregando candidatos...
+                                </div>
+                                <div class="candidatos-table-container">
+                                    <table class="data-table">
+                                        <thead id="candidatos-modal-header">
+                                            <tr>
+                                                <th>Nome</th>
+                                                <th>Número</th>
+                                                <th>Cargo</th>
+                                                <th>Partido</th>
+                                                <th>Votos</th>
+                                                <th>Eleição</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="candidatos-modal-body">
+                                            <!-- Candidatos serão inseridos aqui -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div class="table-pagination" id="candidatos-modal-pagination"></div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn btn-secondary" onclick="fecharModalMunicipio()">Fechar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Upload Tab -->
+            <div id="upload" class="tab-content">
+                <div class="upload-header">
+                    <h2>Upload de Dados CSV</h2>
+                    <p>Importe dados do TSE para análise</p>
+                </div>
+
+                <!-- Abas de Upload -->
+                <div class="upload-tabs">
+                    <button class="upload-tab-btn active" data-upload-type="candidatos">
+                        <i class="fas fa-users"></i>
+                        Candidatos e Votos
+                    </button>
+                    <button class="upload-tab-btn" data-upload-type="perfil-eleitor">
+                        <i class="fas fa-user-check"></i>
+                        Perfil do Eleitor
+                    </button>
+                </div>
+
+                <!-- Upload Candidatos/Votos -->
+                <div id="upload-candidatos" class="upload-section">
+                    <div class="upload-area" id="upload-area">
+                        <div class="upload-content">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <h3>Arraste e solte seu arquivo CSV aqui</h3>
+                            <p>ou clique para selecionar</p>
+                            <p class="upload-info">📋 O sistema detectará automaticamente os dados da eleição</p>
+                            <input type="file" id="csv-file" accept=".csv" style="display: none;">
+                            <button class="btn btn-primary"
+                                onclick="event.stopPropagation(); document.getElementById('csv-file').click()">
+                                <i class="fas fa-upload"></i>
+                                Selecionar e Processar
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Barra de Progresso -->
+                    <div id="progress-container" class="progress-container" style="display: none;">
+                        <div class="progress-header">
+                            <span id="progress-text">Processando arquivo...</span>
+                            <span id="progress-percentage">0%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div id="progress-fill" class="progress-fill"></div>
+                        </div>
+                        <div id="progress-details" class="progress-details">
+                            <span id="progress-current">0</span> de <span id="progress-total">0</span> registros
+                        </div>
+                    </div>
+
+                    <div class="upload-form" id="upload-form" style="display: none;">
+                        <h3>Configurações da Eleição</h3>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="eleicao-ano">Ano da Eleição</label>
+                                <input type="number" id="eleicao-ano" min="1990" max="2030" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="eleicao-tipo">Tipo da Eleição</label>
+                                <input type="text" id="eleicao-tipo" placeholder="Ex: Eleição Ordinária" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="eleicao-descricao">Descrição</label>
+                                <input type="text" id="eleicao-descricao"
+                                    placeholder="Ex: Eleições Gerais Estaduais 2018">
+                            </div>
+                            <div class="form-group">
+                                <label for="eleicao-turno">Turno</label>
+                                <select id="eleicao-turno">
+                                    <option value="1">1º Turno</option>
+                                    <option value="2">2º Turno</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="tipo-importacao">Tipo de Importação</label>
+                                <select id="tipo-importacao">
+                                    <option value="normal">Normal (Recomendado para arquivos pequenos)</option>
+                                    <option value="otimizada">Otimizada (Recomendado para arquivos grandes)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button class="btn btn-secondary" onclick="cancelarUpload()">Cancelar</button>
+                            <button class="btn btn-primary" onclick="processarUpload()">
+                                <i class="fas fa-upload"></i>
+                                Processar CSV
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="upload-progress" id="upload-progress" style="display: none;">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progress-fill"></div>
+                        </div>
+                        <p id="progress-text">Processando...</p>
+                    </div>
+
+                    <div class="upload-result" id="upload-result" style="display: none;">
+                        <div class="result-success">
+                            <i class="fas fa-check-circle"></i>
+                            <h3>Upload Concluído!</h3>
+                            <div class="result-stats" id="result-stats"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Upload Perfil do Eleitor -->
+                <div id="upload-perfil-eleitor" class="upload-section" style="display: none;">
+                    <div class="upload-area" id="upload-area-perfil">
+                        <div class="upload-content">
+                            <i class="fas fa-user-check"></i>
+                            <h3>Arraste e solte seu arquivo CSV de perfil do eleitor aqui</h3>
+                            <p>ou clique para selecionar</p>
+                            <p class="upload-info">📊 Arquivos de perfil do eleitor por seção eleitoral</p>
+                            <input type="file" id="csv-file-perfil" accept=".csv" style="display: none;">
+                            <button class="btn btn-primary"
+                                onclick="event.stopPropagation(); document.getElementById('csv-file-perfil').click()">
+                                <i class="fas fa-upload"></i>
+                                Selecionar e Processar
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Barra de Progresso -->
+                    <div id="progress-container-perfil" class="progress-container" style="display: none;">
+                        <div class="progress-header">
+                            <span id="progress-text-perfil">Processando arquivo...</span>
+                            <span id="progress-percentage-perfil">0%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div id="progress-fill-perfil" class="progress-fill"></div>
+                        </div>
+                        <div id="progress-details-perfil" class="progress-details">
+                            <span id="progress-current-perfil">0</span> de <span id="progress-total-perfil">0</span>
+                            registros
+                        </div>
+                    </div>
+
+                    <div class="upload-result" id="upload-result-perfil" style="display: none;">
+                        <div class="result-success">
+                            <i class="fas fa-check-circle"></i>
+                            <h3>Upload Concluído!</h3>
+                            <div class="result-stats" id="result-stats-perfil"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="upload-help">
+                    <h3>Como usar:</h3>
+                    <ol>
+                        <li>Baixe o template CSV clicando no botão abaixo</li>
+                        <li>Preencha com seus dados do TSE</li>
+                        <li>Faça o upload do arquivo</li>
+                        <li>Configure as informações da eleição</li>
+                        <li>Processe os dados</li>
+                    </ol>
+                    <div class="upload-actions">
+                        <button class="btn btn-outline" onclick="baixarTemplate()">
+                            <i class="fas fa-download"></i>
+                            Baixar Template CSV
+                        </button>
+                        <button class="btn btn-danger" onclick="limparBaseDados()" id="btn-limpar-dados">
+                            <i class="fas fa-trash-alt"></i>
+                            Limpar Base de Dados
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabelas Tab -->
+            <div id="tabelas" class="tab-content">
+                <div class="tabelas-header">
+                    <h2>Tabelas Configuráveis</h2>
+                    <p>Visualize e analise os dados em tabelas personalizáveis</p>
+                </div>
+
+                <div class="tabelas-controls">
+                    <!-- Filtros Básicos -->
+                    <div class="filters-section">
+                        <h3>Filtros Básicos</h3>
+                        <div class="filters-grid">
+                            <div class="control-group">
+                                <label for="tabela-eleicao">Eleição</label>
+                                <select id="tabela-eleicao">
+                                    <option value="">Selecione uma eleição</option>
+                                </select>
+                            </div>
+                            <div class="control-group">
+                                <label for="tabela-agrupar">Agrupar por</label>
+                                <select id="tabela-agrupar">
+                                    <option value="candidato">Candidato</option>
+                                    <option value="municipio">Município</option>
+                                    <option value="cargo">Cargo</option>
+                                    <option value="zona">Zona</option>
+                                    <option value="partido">Partido</option>
+                                    <option value="nenhum">Nenhum (detalhado)</option>
+                                </select>
+                            </div>
+                            <div class="control-group">
+                                <label for="tabela-cargo">Cargo</label>
+                                <select id="tabela-cargo">
+                                    <option value="">Todos os cargos</option>
+                                    <option value="GOVERNADOR">Governador</option>
+                                    <option value="SENADOR">Senador</option>
+                                    <option value="DEPUTADO FEDERAL">Deputado Federal</option>
+                                    <option value="DEPUTADO ESTADUAL">Deputado Estadual</option>
+                                </select>
+                            </div>
+                            <div class="control-group">
+                                <label for="tabela-zona">Zona Eleitoral</label>
+                                <input type="number" id="tabela-zona" placeholder="Ex: 71" min="1">
+                            </div>
+                            <div class="control-group">
+                                <label for="tabela-secao">Seção</label>
+                                <input type="number" id="tabela-secao" placeholder="Ex: 20" min="1">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Busca Avançada -->
+                    <div class="filters-section">
+                        <h3>Busca Avançada</h3>
+                        <div class="search-grid">
+                            <div class="control-group">
+                                <label for="tabela-busca-candidato">Candidato</label>
+                                <div class="search-container">
+                                    <input type="text" id="tabela-busca-candidato"
+                                        placeholder="Digite o nome do candidato..." autocomplete="off">
+                                    <div id="candidato-suggestions" class="suggestions-dropdown" style="display: none;">
+                                    </div>
+                                </div>
+                                <small>Busca por nome completo ou parcial</small>
+                            </div>
+                            <div class="control-group">
+                                <label for="tabela-busca-municipio">Município</label>
+                                <input type="text" id="tabela-busca-municipio" placeholder="Digite o nome da cidade...">
+                                <small>Busca por nome completo ou parcial</small>
+                            </div>
+                            <div class="control-group">
+                                <label for="tabela-busca-numero">Número do Candidato</label>
+                                <input type="text" id="tabela-busca-numero" placeholder="Ex: 15, 13, 22...">
+                                <small>Busca por número de candidato</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Configurações de Exibição -->
+                    <div class="filters-section">
+                        <h3>Configurações de Exibição</h3>
+                        <div class="display-grid">
+                            <div class="control-group">
+                                <label for="tabela-colunas">Colunas</label>
+                                <select id="tabela-colunas" multiple>
+                                    <option value="municipio">Município</option>
+                                    <option value="votos">Votos</option>
+                                    <option value="candidato">Candidato</option>
+                                    <option value="cargo">Cargo</option>
+                                    <option value="numero">Número</option>
+                                    <option value="zona">Zona</option>
+                                    <option value="partido">Partido</option>
+                                    <option value="secao">Seção</option>
+                                    <option value="local">Local de Votação</option>
+                                    <option value="endereco">Endereço</option>
+                                    <option value="eleicao">Eleição</option>
+                                    <option value="turno">Turno</option>
+                                </select>
+                                <small>Segure Ctrl para selecionar múltiplas</small>
+                            </div>
+                            <div class="control-group">
+                                <label for="tabela-ordenar">Ordenar por</label>
+                                <select id="tabela-ordenar">
+                                    <option value="votos">Votos</option>
+                                    <option value="municipio">Município</option>
+                                    <option value="candidato">Candidato</option>
+                                    <option value="cargo">Cargo</option>
+                                    <option value="zona">Zona</option>
+                                    <option value="partido">Partido</option>
+                                    <option value="secao">Seção</option>
+                                    <option value="numero">Número</option>
+                                </select>
+                            </div>
+                            <div class="control-group">
+                                <label for="tabela-ordem">Ordem</label>
+                                <select id="tabela-ordem">
+                                    <option value="DESC">Decrescente</option>
+                                    <option value="ASC">Crescente</option>
+                                </select>
+                            </div>
+                            <div class="control-group">
+                                <label for="tabela-limite">Limite de Registros</label>
+                                <input type="number" id="tabela-limite" value="100" min="1" max="10000">
+                                <small>Máximo: 10.000 registros</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="control-actions">
+                        <button class="btn btn-secondary" onclick="limparFiltrosTabela()">
+                            <i class="fas fa-eraser"></i>
+                            Limpar Filtros
+                        </button>
+                        <button class="btn btn-primary" onclick="carregarTabela()">
+                            <i class="fas fa-search"></i>
+                            Buscar Dados
+                        </button>
+                    </div>
+
+                    <!-- Botões de Exportação -->
+                    <div class="export-actions" id="export-actions" style="display: none;">
+                        <h4>Exportar Dados</h4>
+                        <div class="export-buttons">
+                            <button class="btn btn-success" onclick="exportarExcel()" id="btn-export-excel">
+                                <i class="fas fa-file-excel"></i>
+                                Exportar Excel
+                            </button>
+                            <button class="btn btn-danger" onclick="exportarPDF()" id="btn-export-pdf">
+                                <i class="fas fa-file-pdf"></i>
+                                Exportar PDF
+                            </button>
+                            <button class="btn btn-info" onclick="imprimirTabela()" id="btn-print">
+                                <i class="fas fa-print"></i>
+                                Imprimir
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tabelas-content">
+                    <div class="table-container">
+                        <table id="tabela-dados" class="data-table">
+                            <thead id="tabela-header"></thead>
+                            <tbody id="tabela-body"></tbody>
+                        </table>
+                    </div>
+                    <div class="table-pagination" id="tabela-pagination"></div>
+                </div>
+            </div>
+
+            <!-- Candidatos Tab -->
+            <div id="candidatos" class="tab-content">
+                <div class="candidatos-header">
+                    <h2>Gerenciar Candidatos</h2>
+                    <p>Visualize, filtre e analise dados dos candidatos</p>
+                </div>
+
+                <div class="candidatos-controls">
+                    <!-- Filtros de Candidatos -->
+                    <div class="filters-section">
+                        <h3>Filtros de Candidatos</h3>
+                        <div class="filters-grid">
+                            <div class="control-group">
+                                <label for="candidatos-eleicao">Eleição</label>
+                                <select id="candidatos-eleicao">
+                                    <option value="">Selecione uma eleição</option>
+                                </select>
+                            </div>
+                            <div class="control-group">
+                                <label for="candidatos-partido">Partido</label>
+                                <input type="text" id="candidatos-partido"
+                                    placeholder="Digite o nome ou sigla do partido...">
+                            </div>
+                            <div class="control-group">
+                                <label for="candidatos-cargo">Cargo</label>
+                                <select id="candidatos-cargo">
+                                    <option value="">Todos os cargos</option>
+                                    <option value="GOVERNADOR">Governador</option>
+                                    <option value="SENADOR">Senador</option>
+                                    <option value="DEPUTADO FEDERAL">Deputado Federal</option>
+                                    <option value="DEPUTADO ESTADUAL">Deputado Estadual</option>
+                                </select>
+                            </div>
+                            <div class="control-group">
+                                <label for="candidatos-nome">Nome do Candidato</label>
+                                <input type="text" id="candidatos-nome" placeholder="Digite o nome do candidato...">
+                            </div>
+                            <div class="control-group">
+                                <label for="candidatos-situacao">Situação</label>
+                                <select id="candidatos-situacao">
+                                    <option value="">Todas as situações</option>
+                                    <option value="APTO">Apto</option>
+                                    <option value="INAPTO">Inapto</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Configurações de Exibição e Ações -->
+                    <div class="display-section">
+                        <h3>Configurações de Exibição</h3>
+                        <div class="display-controls-inline">
+                            <div class="control-group">
+                                <label for="candidatos-ordenar">Ordenar por</label>
+                                <select id="candidatos-ordenar">
+                                    <option value="total_votos">Total de Votos</option>
+                                    <option value="nome">Nome</option>
+                                    <option value="numero">Número</option>
+                                    <option value="partido">Partido</option>
+                                    <option value="cargo">Cargo</option>
+                                </select>
+                            </div>
+                            <div class="control-group">
+                                <label for="candidatos-ordem">Ordem</label>
+                                <select id="candidatos-ordem">
+                                    <option value="DESC">Decrescente</option>
+                                    <option value="ASC">Crescente</option>
+                                </select>
+                            </div>
+                            <div class="control-group">
+                                <label for="candidatos-limite">Limite de Registros</label>
+                                <select id="candidatos-limite">
+                                    <option value="50">50</option>
+                                    <option value="100" selected>100</option>
+                                    <option value="200">200</option>
+                                    <option value="500">500</option>
+                                </select>
+                            </div>
+                            <div class="action-buttons-inline">
+                                <button id="candidatos-buscar" class="btn btn-primary">
+                                    <i class="fas fa-search"></i>
+                                    Buscar Candidatos
+                                </button>
+                                <button id="candidatos-limpar" class="btn btn-secondary">
+                                    <i class="fas fa-eraser"></i>
+                                    Limpar Filtros
+                                </button>
+                                <button id="candidatos-exportar" class="btn btn-success">
+                                    <i class="fas fa-download"></i>
+                                    Exportar Excel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabela de Candidatos -->
+                <div class="candidatos-table-container">
+                    <div class="table-wrapper">
+                        <table class="data-table">
+                            <thead id="candidatos-header">
+                                <tr>
+                                    <th>Nome</th>
+                                    <th>Número</th>
+                                    <th>Cargo</th>
+                                    <th>Partido</th>
+                                    <th>Situação</th>
+                                    <th>Total de Votos</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="candidatos-body">
+                                <tr>
+                                    <td colspan="7" class="empty-state">
+                                        <i class="fas fa-users"></i>
+                                        <h3>Nenhum candidato encontrado</h3>
+                                        <p>Configure os filtros e clique em "Buscar Candidatos" para visualizar os dados
+                                        </p>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="table-pagination" id="candidatos-pagination"></div>
+                </div>
+
+                <!-- Estatísticas dos Candidatos -->
+                <div class="candidatos-stats" id="candidatos-stats" style="display: none;">
+                    <h3>Estatísticas dos Candidatos</h3>
+                    <div class="stats-grid" id="candidatos-stats-grid">
+                        <!-- Estatísticas serão inseridas aqui -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Perfil do Eleitor Tab -->
+            <div id="eleitor" class="tab-content">
+                <div class="eleitor-header">
+                    <h2>Perfil do Eleitor</h2>
+                    <p>Análise comparativa do perfil dos eleitores de Santa Catarina (2018 vs 2022)</p>
+                </div>
+
+                <div class="eleitor-content">
+                    <div class="eleitor-info">
+                        <div class="info-card">
+                            <i class="fas fa-info-circle"></i>
+                            <h3>Dados Disponíveis</h3>
+                            <p>Análise detalhada do perfil dos eleitores por gênero, faixa etária, escolaridade e estado
+                                civil</p>
+                        </div>
+                        <div class="info-card">
+                            <i class="fas fa-chart-line"></i>
+                            <h3>Comparação Temporal</h3>
+                            <p>Evolução do perfil eleitoral entre as eleições de 2018 e 2022</p>
+                        </div>
+                        <div class="info-card">
+                            <i class="fas fa-filter"></i>
+                            <h3>Filtros Avançados</h3>
+                            <p>Análise por município, zona eleitoral e outras características</p>
+                        </div>
+                    </div>
+
+                    <div class="eleitor-actions">
+                        <button class="btn btn-primary" onclick="abrirPaginaEleitor()">
+                            <i class="fas fa-user-check"></i>
+                            Abrir Análise Completa
+                        </button>
+                        <button class="btn btn-secondary" onclick="carregarEstatisticasEleitor()">
+                            <i class="fas fa-chart-bar"></i>
+                            Carregar Estatísticas
+                        </button>
+                    </div>
+
+                    <div class="eleitor-preview" id="eleitor-preview">
+                        <div class="preview-placeholder">
+                            <i class="fas fa-user-check"></i>
+                            <h3>Análise do Perfil do Eleitor</h3>
+                            <p>Clique em "Abrir Análise Completa" para visualizar os gráficos e estatísticas detalhadas
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ranking Tab -->
+            <div id="ranking" class="tab-content">
+                <div class="ranking-header">
+                    <h2>Ranking por Município</h2>
+                    <p>Top 10 candidatos mais votados para Deputado Estadual e Federal em cada município</p>
+                </div>
+
+                <div class="ranking-controls">
+                    <div class="control-group">
+                        <label for="ranking-eleicao">Eleição</label>
+                        <select id="ranking-eleicao">
+                            <option value="">Selecione uma eleição</option>
+                        </select>
+                    </div>
+                    <div class="control-group" style="flex-grow: 1;">
+                        <label for="ranking-busca-municipio">Filtrar Município</label>
+                        <div class="search-container">
+                            <input type="text" id="ranking-busca-municipio"
+                                placeholder="Digite para filtrar municípios na lista...">
+                            <button class="btn btn-primary" id="btn-buscar-ranking">
+                                <i class="fas fa-search"></i> Carregar Ranking
+                            </button>
+                            <button class="btn btn-secondary" id="btn-toggle-layout"
+                                title="Alternar Layout de Impressão">
+                                <i class="fas fa-print"></i>
+                            </button>
+                            <button class="btn btn-success" id="btn-exportar-excel" title="Exportar para Excel">
+                                <i class="fas fa-file-excel"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="ranking-loading" class="loading" style="display: none;">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    Carregando ranking completo (pode demorar alguns segundos)...
+                </div>
+
+                <div id="ranking-results" class="ranking-results-grid">
+                    <!-- Resultados aqui -->
+                    <div class="placeholder-msg">
+                        <i class="fas fa-medal"></i>
+                        <p>Selecione uma eleição e clique em Carregar Ranking para visualizar.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mapas Tab -->
+            <div id="mapas" class="tab-content">
+                <div class="mapas-header">
+                    <h2>Mapas de Calor</h2>
+                    <p>Visualize a distribuição geográfica dos votos</p>
+                </div>
+
+                <div class="mapas-controls">
+                    <div class="control-group">
+                        <label for="mapa-eleicao">Eleição</label>
+                        <select id="mapa-eleicao">
+                            <option value="">Selecione uma eleição</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label for="mapa-tipo">Tipo de Visualização</label>
+                        <select id="mapa-tipo">
+                            <option value="heatmap">Mapa de Calor</option>
+                            <option value="circulos">Círculos Proporcionais</option>
+                            <option value="ambos">Ambos</option>
+                        </select>
+                    </div>
+                    <div class="control-group candidato-group">
+                        <label for="mapa-candidato">Candidato</label>
+                        <div class="candidato-search-container">
+                            <input type="text" id="mapa-candidato-search" placeholder="Buscar candidato..."
+                                autocomplete="off">
+                            <select id="mapa-candidato" size="12">
+                                <option value="">Todos os candidatos</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" onclick="carregarMapa()">
+                        <i class="fas fa-map"></i>
+                        Carregar Mapa
+                    </button>
+                </div>
+
+                <div class="mapas-content">
+                    <div id="mapa-container" class="mapa-container">
+                        <div id="mapa" class="mapa"></div>
+                        <div id="mapa-status" class="mapa-status">
+                            <i class="fas fa-spinner fa-spin"></i>
+                            Carregando mapa...
+                        </div>
+                    </div>
+                    <div class="mapa-legend" id="mapa-legend">
+                        <h4>Legenda</h4>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #0000ff;"></div>
+                            <span>Poucos votos</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #00ffff;"></div>
+                            <span>Votos médios</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #00ff00;"></div>
+                            <span>Muitos votos</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #ffff00;"></div>
+                            <span>Votos altos</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #ff0000;"></div>
+                            <span>Máximo de votos</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Relatórios Tab -->
+            <div id="relatorios" class="tab-content">
+                <div class="relatorios-header">
+                    <h2>Relatórios</h2>
+                    <p>Crie e gerencie relatórios personalizados</p>
+                </div>
+
+                <div class="relatorios-actions">
+                    <button class="btn btn-primary" onclick="criarRelatorio()">
+                        <i class="fas fa-plus"></i>
+                        Novo Relatório
+                    </button>
+                    <button class="btn btn-secondary" onclick="carregarRelatorios()">
+                        <i class="fas fa-refresh"></i>
+                        Atualizar Lista
+                    </button>
+                </div>
+
+                <div class="relatorios-list" id="relatorios-list">
+                    <!-- Lista de relatórios será carregada aqui -->
+                </div>
+            </div>
+
+            <!-- Análise Regional Tab -->
+            <div id="regionais" class="tab-content">
+                <div class="regionais-header">
+                    <h2>Análise Regional</h2>
+                    <p>Análise de votos por mesorregiões e regionais PSDB de Santa Catarina</p>
+                </div>
+
+                <!-- Estatísticas Gerais -->
+                <div class="stats-grid" id="regionais-stats">
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-map"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3 id="total-mesorregioes">0</h3>
+                            <p>Mesorregiões</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-building"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3 id="total-regionais">0</h3>
+                            <p>Regionais PSDB</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-city"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3 id="total-municipios-regionais">0</h3>
+                            <p>Municípios</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3 id="populacao-total">0</h3>
+                            <p>População Total</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filtros -->
+                <div class="filters-section">
+                    <h3>Filtros de Análise</h3>
+                    <div class="filters-grid">
+                        <div class="control-group">
+                            <label for="regionais-eleicao">Eleição</label>
+                            <select id="regionais-eleicao">
+                                <option value="">Selecione uma eleição</option>
+                            </select>
+                        </div>
+                        <div class="control-group">
+                            <label for="regionais-cargo">Cargo</label>
+                            <select id="regionais-cargo">
+                                <option value="">Todos os cargos</option>
+                                <option value="Governador">Governador</option>
+                                <option value="Senador">Senador</option>
+                                <option value="Deputado Federal">Deputado Federal</option>
+                                <option value="Deputado Estadual">Deputado Estadual</option>
+                            </select>
+                        </div>
+                        <div class="control-group">
+                            <label for="regionais-mesorregiao">Mesorregião</label>
+                            <select id="regionais-mesorregiao">
+                                <option value="">Todas as mesorregiões</option>
+                            </select>
+                        </div>
+                        <div class="control-group">
+                            <label for="regionais-regional">Regional PSDB</label>
+                            <select id="regionais-regional">
+                                <option value="">Todas as regionais</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="filter-actions">
+                        <button class="btn btn-primary" onclick="sistema.carregarAnaliseRegional()">
+                            <i class="fas fa-search"></i>
+                            Analisar
+                        </button>
+                        <button class="btn btn-secondary" onclick="sistema.limparFiltrosRegionais()">
+                            <i class="fas fa-eraser"></i>
+                            Limpar Filtros
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Resultados -->
+                <div class="regionais-results" id="regionais-results">
+                    <div class="loading" id="regionais-loading" style="display: none;">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        Carregando análise regional...
+                    </div>
+                    <div class="no-data" id="regionais-no-data" style="display: none;">
+                        Selecione uma eleição para visualizar a análise regional
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Modals -->
+    <div id="modal-relatorio" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-titulo">Novo Relatório</h3>
+                <button class="modal-close" onclick="fecharModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="form-relatorio">
+                    <div class="form-group">
+                        <label for="relatorio-nome">Nome do Relatório</label>
+                        <input type="text" id="relatorio-nome" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="relatorio-descricao">Descrição</label>
+                        <textarea id="relatorio-descricao" rows="3"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="relatorio-eleicao">Eleição</label>
+                        <select id="relatorio-eleicao">
+                            <option value="">Selecione uma eleição</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="relatorio-tipo">Tipo de Visualização</label>
+                        <select id="relatorio-tipo">
+                            <option value="tabela">Tabela</option>
+                            <option value="grafico">Gráfico</option>
+                            <option value="mapa">Mapa</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="relatorio-colunas">Colunas (para tabelas)</label>
+                        <select id="relatorio-colunas" multiple>
+                            <option value="municipio">Município</option>
+                            <option value="votos">Votos</option>
+                            <option value="candidato">Candidato</option>
+                            <option value="cargo">Cargo</option>
+                            <option value="zona">Zona</option>
+                            <option value="secao">Seção</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="fecharModal()">Cancelar</button>
+                <button class="btn btn-primary" onclick="salvarRelatorio()">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <!-- Bibliotecas para exportação -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <script src="config/cache.js"></script>
+    <script src="config/eleicoes-mock.js"></script>
+    <script src="app.js?v=8"></script>
+    <script src="analise-complementar.js"></script>
+
+    <script>
+        // Funções para a página do eleitor
+        function abrirPaginaEleitor() {
+            window.open('Eleitor.html', '_blank');
+        }
+
+        function carregarEstatisticasEleitor() {
+            const preview = document.getElementById('eleitor-preview');
+            preview.innerHTML = `
+                <div class="loading">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    Carregando estatísticas do eleitor...
+                </div>
+            `;
+
+            // Simular carregamento de estatísticas
+            setTimeout(() => {
+                preview.innerHTML = `
+                    <div class="eleitor-stats-preview">
+                        <h3>Estatísticas Rápidas</h3>
+                        <div class="stats-preview-grid">
+                            <div class="stat-preview-item">
+                                <div class="stat-number">5.2M</div>
+                                <div class="stat-label">Total Eleitores 2022</div>
+                            </div>
+                            <div class="stat-preview-item">
+                                <div class="stat-number">4.8M</div>
+                                <div class="stat-label">Total Eleitores 2018</div>
+                            </div>
+                            <div class="stat-preview-item">
+                                <div class="stat-number">+8.3%</div>
+                                <div class="stat-label">Crescimento</div>
+                            </div>
+                            <div class="stat-preview-item">
+                                <div class="stat-number">295</div>
+                                <div class="stat-label">Municípios</div>
+                            </div>
+                        </div>
+                        <div class="preview-actions">
+                            <button class="btn btn-primary" onclick="abrirPaginaEleitor()">
+                                <i class="fas fa-chart-line"></i>
+                                Ver Análise Completa
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }, 1500);
+        }
+    </script>
+    <script src="ranking.js"></script>
+</body>
+
+</html>

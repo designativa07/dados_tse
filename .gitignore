@@ -1,0 +1,27 @@
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+
+# Environment
+.env
+.env.local
+
+# Backups and SQL
+*.sql
+*.backup
+backup_dados_tse.sql
+dados_tse_backup
+
+# Large Data & Media
+DADOS/
+uploads/
+fotos_candidatos/
+foto_cand*/
+perfil_eleitor_secao_*/
+
+# OS Files
+.DS_Store
+Thumbs.db
