@@ -250,7 +250,6 @@ class SistemaEleitoral {
 
             // Carregar outros dados em paralelo
             await Promise.all([
-                this.carregarRelatorios(),
                 this.carregarEleicoesCandidatos()
             ]);
 
@@ -1474,15 +1473,6 @@ class SistemaEleitoral {
         // Lista de provedores com fallback
         const provedores = [
             {
-                nome: 'OpenStreetMap',
-                url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                opcoes: {
-                    attribution: '© OpenStreetMap contributors',
-                    subdomains: ['a', 'b', 'c'],
-                    maxZoom: 19
-                }
-            },
-            {
                 nome: 'CartoDB Positron',
                 url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
                 opcoes: {
@@ -1492,21 +1482,21 @@ class SistemaEleitoral {
                 }
             },
             {
+                nome: 'OpenStreetMap',
+                url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                opcoes: {
+                    attribution: '© OpenStreetMap contributors',
+                    subdomains: ['a', 'b', 'c'],
+                    maxZoom: 19
+                }
+            },
+            {
                 nome: 'CartoDB Dark Matter',
                 url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
                 opcoes: {
                     attribution: '© OpenStreetMap contributors © CARTO',
                     subdomains: 'abcd',
                     maxZoom: 20
-                }
-            },
-            {
-                nome: 'Stamen Terrain',
-                url: 'https://stamen-tiles-{s}.a.ssl.fastly.net/terrain/{z}/{x}/{y}{r}.png',
-                opcoes: {
-                    attribution: 'Map tiles by Stamen Design, CC BY 3.0 — Map data © OpenStreetMap contributors',
-                    subdomains: 'abcd',
-                    maxZoom: 18
                 }
             }
         ];
@@ -1523,8 +1513,8 @@ class SistemaEleitoral {
             collapsed: false
         }).addTo(this.map);
 
-        // Tentar carregar o primeiro provedor (OpenStreetMap)
-        this.tentarCarregarProvedor('OpenStreetMap');
+        // Tentar carregar o primeiro provedor (CartoDB Positron)
+        this.tentarCarregarProvedor('CartoDB Positron');
     }
 
     tentarCarregarProvedor(nomeProvedor) {
@@ -1655,17 +1645,203 @@ class SistemaEleitoral {
             }
         });
 
+        if (data.dados.length === 0 && data.aviso) {
+            this.mostrarErro(data.aviso);
+            return;
+        }
+
         if (!data.dados || data.dados.length === 0) {
             this.mostrarErro('Nenhum dado encontrado para exibir no mapa.');
             return;
         }
+        // Coordenadas dos municípios de SC (hardcoded - mesmo que perfil-candidato.html)
+        const coordenadasSC = {
+            'FLORIANÓPOLIS': [-27.5954, -48.5480], 'JOINVILLE': [-26.3044, -48.8481],
+            'BLUMENAU': [-26.9194, -49.0661], 'SÃO JOSÉ': [-27.6136, -48.6366],
+            'CRICIÚMA': [-28.6775, -49.3697], 'LAGES': [-27.8161, -50.3259],
+            'CHAPECÓ': [-27.0964, -52.6181], 'ITAJAÍ': [-26.9078, -48.6619],
+            'PALHOÇA': [-27.6444, -48.6678], 'BALNEÁRIO CAMBORIÚ': [-26.9906, -48.6342],
+            'TUBARÃO': [-28.4667, -49.0069], 'SÃO BENTO DO SUL': [-26.2500, -49.3833],
+            'ARARANGUÁ': [-28.9356, -49.4958], 'CAÇADOR': [-26.7758, -51.0139],
+            'VIDEIRA': [-27.0089, -51.1517], 'BRUSQUE': [-27.0978, -48.9128],
+            'SÃO MIGUEL DO OESTE': [-26.7250, -53.5181], 'CONCÓRDIA': [-27.2333, -52.0167],
+            'JARAGUÁ DO SUL': [-26.4858, -49.0669], 'NOVA TRENTO': [-27.2858, -48.9308],
+            'INDAIAL': [-26.8989, -49.2317], 'SÃO JOÃO BATISTA': [-27.2761, -48.8489],
+            'BOMBINHAS': [-27.1389, -48.5089], 'PORTO BELO': [-27.1567, -48.5450],
+            'GAROPABA': [-28.0250, -48.6122], 'IMBITUBA': [-28.2400, -48.6700],
+            'LAGUNA': [-28.4833, -48.7833], 'SIDERÓPOLIS': [-28.5981, -49.4267],
+            'URUSSANGA': [-28.5181, -49.3208], 'TURVO': [-28.9250, -49.6750],
+            'MELEIRO': [-28.8250, -49.6417], 'JACINTO MACHADO': [-28.9967, -49.7633],
+            'SOMBRIO': [-29.1081, -49.8081], 'TREZE DE MAIO': [-28.5581, -49.1417],
+            'MORRO DA FUMAÇA': [-28.6500, -49.2083], 'FORQUILHINHA': [-28.7458, -49.4708],
+            'NOVA VENEZA': [-28.6333, -49.5000], 'ORLEANS': [-28.3581, -49.2917],
+            'GRAVATAL': [-28.3333, -49.0333], 'SÃO LUDGERO': [-28.3250, -49.1750],
+            'SÃO MARTINHO': [-28.1581, -48.9750], 'SÃO BONIFÁCIO': [-27.9000, -48.9250],
+            'ANITÁPOLIS': [-27.9000, -49.1250], 'SÃO JOAQUIM': [-28.2939, -49.9317],
+            'BOM JARDIM DA SERRA': [-28.3333, -49.6250], 'BOCAÍNA DO SUL': [-27.7417, -49.9417],
+            'URUBICI': [-28.0167, -49.5917], 'BOM RETIRO': [-27.8000, -49.4833],
+            'CAMPO BELO DO SUL': [-27.9000, -50.7583], 'CURITIBANOS': [-27.2833, -50.5833],
+            'FREI ROGÉRIO': [-27.1750, -50.8083], 'MONTE CARLO': [-27.2250, -50.9750],
+            'PONTE ALTA': [-27.4833, -50.3750], 'SÃO CRISTÓVÃO DO SUL': [-27.2667, -50.4417],
+            'VARGEM BONITA': [-27.0083, -51.7417], 'ABDON BATISTA': [-27.6167, -51.0167],
+            'BRUNÓPOLIS': [-27.3083, -50.8667], 'CAPÃO ALTO': [-27.9333, -50.5083],
+            'CELSO RAMOS': [-27.6333, -51.3333], 'ERMO': [-28.1000, -49.4250],
+            'IBIAM': [-27.1833, -51.2333], 'IBICARÉ': [-27.0917, -51.3583],
+            'IMBUIA': [-27.4917, -49.4250], 'JABORÁ': [-27.1750, -51.7333],
+            'JOSÉ BOITEUX': [-26.9583, -49.6250], 'LAURO MULLER': [-28.3917, -49.3917],
+            'LEBON RÉGIS': [-26.9250, -50.6917], 'PAINEL': [-27.9167, -50.1083],
+            'PALMEIRA': [-27.5833, -50.1583], 'PONTE SERRADA': [-26.8750, -52.0167],
+            'RIO RUFINO': [-27.8583, -49.7750], 'SANTA CECÍLIA': [-26.9583, -50.4250],
+            'SÃO JOSÉ DO CERRITO': [-27.6667, -50.5750], 'TUNÁPOLIS': [-26.9667, -53.6417],
+            'VARGEM': [-27.4833, -50.9750], 'ZORTÉA': [-27.4500, -51.5500],
+            'ABELARDO LUZ': [-26.5647, -52.3281], 'AGROLÂNDIA': [-27.4117, -49.8225],
+            'AGRONÔMICA': [-27.2650, -49.7081], 'ÁGUA DOCE': [-26.9983, -51.5539],
+            'ÁGUAS DE CHAPECÓ': [-27.0750, -52.9833], 'ÁGUAS FRIAS': [-26.8800, -52.8583],
+            'ÁGUAS MORNAS': [-27.6972, -48.8231], 'ALFREDO WAGNER': [-27.7000, -49.3333],
+            'ALTO BELA VISTA': [-27.4333, -51.9083], 'ANCHIETA': [-26.5417, -53.3333],
+            'ANGELINA': [-27.5647, -48.9869], 'ANTÔNIO CARLOS': [-27.5186, -48.7681],
+            'APIÚNA': [-27.0347, -49.3897], 'ARABUTÃ': [-27.1583, -52.1417],
+            'ARAQUARI': [-26.3756, -48.7203], 'ARMAZÉM': [-28.2417, -49.0167],
+            'ARROIO TRINTA': [-26.9250, -51.3417], 'ASCURRA': [-26.9539, -49.3758],
+            'ATALANTA': [-27.4167, -49.7833], 'AURORA': [-27.3083, -49.6333],
+            'BALNEÁRIO ARROIO DO SILVA': [-28.9833, -49.4333], 'BALNEÁRIO BARRA DO SUL': [-26.4583, -48.6167],
+            'BALNEÁRIO GAIVOTA': [-29.1500, -49.5833], 'BALNEÁRIO PIÇARRAS': [-26.7644, -48.6703],
+            'BANDEIRANTE': [-26.7667, -53.6417], 'BARRA BONITA': [-26.6500, -53.4333],
+            'BARRA VELHA': [-26.6350, -48.6967], 'BELA VISTA DO TOLDO': [-26.2750, -50.4667],
+            'BELMONTE': [-26.8417, -53.5750], 'BENEDITO NOVO': [-26.7819, -49.3606],
+            'BIGUAÇU': [-27.4939, -48.6556], 'BOCAINA DO SUL': [-27.7417, -49.9417],
+            'BRAÇO DO NORTE': [-28.2750, -49.1667], 'BRAÇO DO TROMBUDO': [-27.3583, -49.8833],
+            'BRUSQUE': [-27.0978, -48.9128], 'CAÇADOR': [-26.7758, -51.0139],
+            'CAIBI': [-27.0750, -53.2500], 'CALMON': [-26.5917, -51.1000],
+            'CAMBORIÚ': [-27.0256, -48.6553], 'CAMPO ALEGRE': [-26.1928, -49.2658],
+            'CAMPO ERÊ': [-26.3917, -53.0833], 'CAMPOS NOVOS': [-27.4017, -51.2250],
+            'CANELINHA': [-27.2617, -48.7658], 'CANOINHAS': [-26.1769, -50.3903],
+            'CAPINZAL': [-27.3417, -51.6083], 'CAPIVARI DE BAIXO': [-28.4500, -48.9583],
+            'CATANDUVAS': [-27.0667, -51.6583], 'CAXAMBU DO SUL': [-27.1583, -52.8750],
+            'CERRO NEGRO': [-27.7917, -50.8667], 'CHAPADÃO DO LAGEADO': [-27.5917, -49.5500],
+            'COCAL DO SUL': [-28.6000, -49.3333], 'CORDILHEIRA ALTA': [-26.9833, -52.6083],
+            'CORONEL FREITAS': [-26.9083, -52.7000], 'CORONEL MARTINS': [-26.5083, -52.6667],
+            'CORREIA PINTO': [-27.5833, -50.3583], 'CORUPÁ': [-26.4258, -49.2439],
+            'CUNHA PORÃ': [-26.9000, -53.1667], 'CUNHATAÍ': [-26.9667, -53.0833],
+            'CURITIBANOS': [-27.2833, -50.5833], 'DESCANSO': [-26.8250, -53.5000],
+            'DIONÍSIO CERQUEIRA': [-26.2558, -53.6372], 'DONA EMMA': [-26.9833, -49.7167],
+            'DOUTOR PEDRINHO': [-26.7167, -49.4833], 'ENTRE RIOS': [-26.7167, -52.5667],
+            'ERVAL VELHO': [-27.2750, -51.4417], 'FAXINAL DOS GUEDES': [-26.8500, -52.2583],
+            'FLOR DO SERTÃO': [-26.7833, -53.3500], 'FRAIBURGO': [-27.0256, -50.8075],
+            'FREI ROGÉRIO': [-27.1750, -50.8083], 'GALVÃO': [-26.4583, -52.6917],
+            'GARUVA': [-26.0289, -48.8544], 'GASPAR': [-26.9306, -49.1156],
+            'GOVERNADOR CELSO RAMOS': [-27.3161, -48.5575], 'GRÃO PARÁ': [-28.1833, -49.2250],
+            'GRAVATAL': [-28.3333, -49.0333], 'GUABIRUBA': [-27.0831, -48.9811],
+            'GUARACIABA': [-26.6000, -53.5250], 'GUARAMIRIM': [-26.4725, -49.0011],
+            'GUARUJÁ DO SUL': [-26.3833, -53.5333], 'GUATAMBÚ': [-27.1333, -52.7917],
+            'HERVAL D´OESTE': [-27.1917, -51.4833], 'IBIAM': [-27.1833, -51.2333],
+            'IBICARÉ': [-27.0917, -51.3583], 'IBIRAMA': [-27.0569, -49.5181],
+            'IÇARA': [-28.7136, -49.3089], 'ILHOTA': [-26.9003, -48.8297],
+            'IMARUÍ': [-28.3333, -48.8167], 'IMBUIA': [-27.4917, -49.4250],
+            'IOMERÊ': [-27.0000, -51.2417], 'IPIRA': [-27.4083, -51.7750],
+            'IPORÃ DO OESTE': [-26.9833, -53.5417], 'IPUAÇU': [-26.6333, -52.4583],
+            'IPUMIRIM': [-27.0750, -52.1333], 'IRACEMINHA': [-26.8167, -53.2750],
+            'IRANI': [-27.0250, -51.9000], 'IRATI': [-26.6583, -52.8917],
+            'IRINEÓPOLIS': [-26.2417, -50.8000], 'ITÁ': [-27.2917, -52.3250],
+            'ITAIÓPOLIS': [-26.3389, -49.9047], 'ITAPEMA': [-27.0903, -48.6108],
+            'ITAPIRANGA': [-27.1667, -53.7167], 'ITAPOÁ': [-26.1167, -48.6167],
+            'ITUPORANGA': [-27.4106, -49.6006], 'JABORÁ': [-27.1750, -51.7333],
+            'JACINTO MACHADO': [-28.9967, -49.7633], 'JAGUARUNA': [-28.6147, -49.0300],
+            'JARAGUÁ DO SUL': [-26.4858, -49.0669], 'JARDINÓPOLIS': [-26.7250, -52.8583],
+            'JOAÇABA': [-27.1761, -51.5014], 'JOINVILLE': [-26.3044, -48.8481],
+            'JOSÉ BOITEUX': [-26.9583, -49.6250], 'JUPIÁ': [-26.3917, -52.7250],
+            'LACERDÓPOLIS': [-27.2583, -51.5583], 'LAGES': [-27.8161, -50.3259],
+            'LAGUNA': [-28.4833, -48.7833], 'LAURO MULLER': [-28.3917, -49.3917],
+            'LEBON RÉGIS': [-26.9250, -50.6917], 'LEOBERTO LEAL': [-27.5083, -49.2750],
+            'LINDÓIA DO SUL': [-27.0500, -52.0667], 'LONTRAS': [-27.1667, -49.5333],
+            'LUIZ ALVES': [-26.7147, -48.9344], 'LUZERNA': [-27.1333, -51.4667],
+            'MACIEIRA': [-26.8583, -51.3667], 'MAFRA': [-26.1114, -49.8050],
+            'MAJOR GERCINO': [-27.4167, -49.0667], 'MAJOR VIEIRA': [-26.3667, -50.3250],
+            'MARACAJÁ': [-28.8500, -49.4583], 'MARAVILHA': [-26.7653, -53.1742],
+            'MAREMA': [-26.8000, -52.6250], 'MASSARANDUBA': [-26.6097, -49.0078],
+            'MATOS COSTA': [-26.4667, -51.1500], 'MELEIRO': [-28.8250, -49.6417],
+            'MIRIM DOCE': [-27.1917, -49.9583], 'MODELO': [-26.7750, -53.0417],
+            'MONDAÍ': [-27.1000, -53.4000], 'MONTE CARLO': [-27.2250, -50.9750],
+            'MONTE CASTELO': [-26.4583, -50.2333], 'MORRO DA FUMAÇA': [-28.6500, -49.2083],
+            'MORRO GRANDE': [-28.8000, -49.7167], 'NAVEGANTES': [-26.8986, -48.6542],
+            'NOVA ERECHIM': [-26.9000, -52.9083], 'NOVA ITABERABA': [-26.9417, -52.8167],
+            'NOVA TRENTO': [-27.2858, -48.9308], 'NOVA VENEZA': [-28.6333, -49.5000],
+            'NOVO HORIZONTE': [-26.4417, -52.8333], 'ORLEANS': [-28.3581, -49.2917],
+            'OTACÍLIO COSTA': [-27.4833, -50.1250], 'OURO': [-27.3417, -51.6250],
+            'OURO VERDE': [-26.6917, -52.3167], 'PAIAL': [-27.2500, -52.5000],
+            'PAINEL': [-27.9167, -50.1083], 'PALHOÇA': [-27.6444, -48.6678],
+            'PALMA SOLA': [-26.3500, -53.2750], 'PALMEIRA': [-27.5833, -50.1583],
+            'PALMITOS': [-27.0669, -53.1592], 'PAPANDUVA': [-26.3833, -50.1417],
+            'PARAÍSO': [-26.6167, -53.6750], 'PASSO DE TORRES': [-29.3083, -49.7167],
+            'PASSOS MAIA': [-26.7833, -52.0583], 'PAULO LOPES': [-27.9617, -48.6856],
+            'PEDRAS GRANDES': [-28.4333, -49.1917], 'PENHA': [-26.7694, -48.6439],
+            'PERITIBA': [-27.3750, -51.9083], 'PETROLÂNDIA': [-27.5333, -49.6833],
+            'PINHALZINHO': [-26.8500, -52.9917], 'PINHEIRO PRETO': [-27.0417, -51.2250],
+            'PIRATUBA': [-27.4250, -51.7667], 'PLANALTO ALEGRE': [-27.0667, -52.8667],
+            'POMERODE': [-26.7406, -49.1764], 'PONTE ALTA': [-27.4833, -50.3750],
+            'PONTE ALTA DO NORTE': [-27.1583, -50.4667], 'PONTE SERRADA': [-26.8750, -52.0167],
+            'PORTO BELO': [-27.1567, -48.5450], 'PORTO UNIÃO': [-26.2369, -51.0800],
+            'POUSO REDONDO': [-27.2583, -49.9333], 'PRAIA GRANDE': [-29.1917, -49.9500],
+            'PRESIDENTE CASTELO BRANCO': [-27.2250, -51.8000], 'PRESIDENTE GETÚLIO': [-27.0500, -49.6250],
+            'PRESIDENTE NEREU': [-27.2750, -49.3833], 'PRINCESA': [-26.4417, -53.5917],
+            'QUILOMBO': [-26.7250, -52.7250], 'RANCHO QUEIMADO': [-27.6750, -49.0167],
+            'RIO DAS ANTAS': [-26.8917, -51.0750], 'RIO DO CAMPO': [-26.9417, -50.1333],
+            'RIO DO OESTE': [-27.1917, -49.7917], 'RIO DO SUL': [-27.2142, -49.6431],
+            'RIO DOS CEDROS': [-26.7375, -49.2728], 'RIO FORTUNA': [-28.1250, -49.1083],
+            'RIO NEGRINHO': [-26.2558, -49.5181], 'RIO RUFINO': [-27.8583, -49.7750],
+            'RIQUEZA': [-27.0583, -53.3250], 'RODEIO': [-26.9242, -49.3650],
+            'ROMELÂNDIA': [-26.6833, -53.3167], 'SALETE': [-26.9833, -49.9917],
+            'SALTINHO': [-26.6083, -53.0583], 'SALTO VELOSO': [-26.9000, -51.4083],
+            'SANGÃO': [-28.6333, -49.1333], 'SANTA CECÍLIA': [-26.9583, -50.4250],
+            'SANTA HELENA': [-26.9333, -53.6250], 'SANTA ROSA DE LIMA': [-28.0333, -49.1167],
+            'SANTA ROSA DO SUL': [-29.1333, -49.7083], 'SANTA TEREZINHA': [-26.7833, -50.0083],
+            'SANTA TEREZINHA DO PROGRESSO': [-26.6250, -53.2000], 'SANTIAGO DO SUL': [-26.6417, -52.6750],
+            'SANTO AMARO DA IMPERATRIZ': [-27.6861, -48.7822], 'SÃO BENTO DO SUL': [-26.2500, -49.3833],
+            'SÃO BERNARDINO': [-26.4750, -52.9667], 'SÃO BONIFÁCIO': [-27.9000, -48.9250],
+            'SÃO CARLOS': [-27.0833, -53.0083], 'SÃO CRISTÓVÃO DO SUL': [-27.2667, -50.4417],
+            'SÃO DOMINGOS': [-26.5581, -52.5317], 'SÃO FRANCISCO DO SUL': [-26.2433, -48.6386],
+            'SÃO JOÃO BATISTA': [-27.2761, -48.8489], 'SÃO JOÃO DO ITAPERIÚ': [-26.6167, -48.7667],
+            'SÃO JOÃO DO OESTE': [-27.1000, -53.5917], 'SÃO JOÃO DO SUL': [-29.2167, -49.8083],
+            'SÃO JOAQUIM': [-28.2939, -49.9317], 'SÃO JOSÉ': [-27.6136, -48.6366],
+            'SÃO JOSÉ DO CEDRO': [-26.4583, -53.4917], 'SÃO JOSÉ DO CERRITO': [-27.6667, -50.5750],
+            'SÃO LOURENÇO DO OESTE': [-26.3583, -52.8500], 'SÃO LUDGERO': [-28.3250, -49.1750],
+            'SÃO MARTINHO': [-28.1581, -48.9750], 'SÃO MIGUEL DA BOA VISTA': [-26.6917, -53.2500],
+            'SÃO MIGUEL DO OESTE': [-26.7250, -53.5181], 'SÃO PEDRO DE ALCÂNTARA': [-27.5667, -48.8167],
+            'SAUDADES': [-26.9250, -53.0000], 'SCHROEDER': [-26.4128, -49.0697],
+            'SEARA': [-27.1500, -52.3083], 'SERRA ALTA': [-26.7250, -53.0417],
+            'SIDERÓPOLIS': [-28.5981, -49.4267], 'SOMBRIO': [-29.1081, -49.8081],
+            'SUL BRASIL': [-26.7333, -52.9667], 'TAIÓ': [-27.1167, -49.9917],
+            'TANGARÁ': [-27.1000, -51.2500], 'TIGRINHOS': [-26.6833, -53.1583],
+            'TIJUCAS': [-27.2364, -48.6319], 'TIMBÉ DO SUL': [-28.8333, -49.8417],
+            'TIMBÓ': [-26.8231, -49.2728], 'TIMBÓ GRANDE': [-26.6167, -50.6750],
+            'TRÊS BARRAS': [-26.1083, -50.3167], 'TREVISO': [-28.5167, -49.4583],
+            'TREZE DE MAIO': [-28.5581, -49.1417], 'TREZE TÍLIAS': [-27.0000, -51.4083],
+            'TROMBUDO CENTRAL': [-27.2917, -49.7917], 'TUNÁPOLIS': [-26.9667, -53.6417],
+            'TURVO': [-28.9250, -49.6750], 'UNIÃO DO OESTE': [-26.7583, -52.8500],
+            'URUBICI': [-28.0167, -49.5917], 'URUPEMA': [-28.3083, -49.8750],
+            'URUSSANGA': [-28.5181, -49.3208], 'VARGEÃO': [-26.8583, -52.1583],
+            'VARGEM': [-27.4833, -50.9750], 'VARGEM BONITA': [-27.0083, -51.7417],
+            'VIDAL RAMOS': [-27.3833, -49.3583], 'VIDEIRA': [-27.0089, -51.1517],
+            'VITOR MEIRELES': [-26.8750, -49.8333], 'WITMARSUM': [-26.9333, -49.7917],
+            'XANXERÊ': [-26.8756, -52.4036], 'XAVANTINA': [-27.0667, -52.3417],
+            'XAXIM': [-26.9583, -52.5361], 'ZORTÉA': [-27.4500, -51.5500]
+        };
 
-        // Preparar dados para mapa de calor
-        const pontosHeatmap = data.dados.map(item => [
-            parseFloat(item.latitude),
-            parseFloat(item.longitude),
-            parseInt(item.total_votos)
-        ]);
+        // Preparar dados para mapa de calor - usar coordenadas hardcoded se não tiver no banco
+        const pontosHeatmap = data.dados
+            .map(item => {
+                const municipioNome = item.municipio.toUpperCase();
+                const coords = coordenadasSC[municipioNome];
+                if (coords) {
+                    return [coords[0], coords[1], parseInt(item.total_votos)];
+                }
+                // Fallback para coords do banco se existirem
+                if (item.latitude && item.longitude) {
+                    return [parseFloat(item.latitude), parseFloat(item.longitude), parseInt(item.total_votos)];
+                }
+                return null;
+            })
+            .filter(p => p !== null);
 
         // Adicionar mapa de calor
         if (data.tipo === 'heatmap' || data.tipo === 'ambos') {
@@ -1688,9 +1864,15 @@ class SistemaEleitoral {
             this.circulosLayer = L.layerGroup();
 
             data.dados.forEach((item, index) => {
+                const municipioNome = item.municipio.toUpperCase();
+                const coords = coordenadasSC[municipioNome];
+                if (!coords && (!item.latitude || !item.longitude)) return;
+
+                const lat = coords ? coords[0] : parseFloat(item.latitude);
+                const lon = coords ? coords[1] : parseFloat(item.longitude);
                 const raio = Math.max(8, Math.min(25, parseInt(item.total_votos) / 3));
 
-                const circulo = L.circleMarker([parseFloat(item.latitude), parseFloat(item.longitude)], {
+                const circulo = L.circleMarker([lat, lon], {
                     radius: raio,
                     fillColor: '#ff0000',
                     color: '#ff0000',
@@ -1713,12 +1895,16 @@ class SistemaEleitoral {
         }
 
         // Ajustar visualização para mostrar todos os pontos
-        if (data.dados.length > 0) {
+        if (pontosHeatmap.length > 0) {
             const group = new L.featureGroup();
-            data.dados.forEach(item => {
-                group.addLayer(L.marker([parseFloat(item.latitude), parseFloat(item.longitude)]));
+            pontosHeatmap.forEach(point => {
+                if (point && !isNaN(point[0]) && !isNaN(point[1])) {
+                    group.addLayer(L.marker([point[0], point[1]]));
+                }
             });
-            this.map.fitBounds(group.getBounds().pad(0.1));
+            if (group.getLayers().length > 0) {
+                this.map.fitBounds(group.getBounds().pad(0.1));
+            }
         }
     }
 

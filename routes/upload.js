@@ -22,7 +22,7 @@ const storage = multer.diskStorage({
   }
 });
 
-const upload = multer({ 
+const upload = multer({
   storage,
   limits: {
     fileSize: 1024 * 1024 * 1024 // 1GB
@@ -54,16 +54,16 @@ router.post('/csv', upload.single('csv'), async (req, res) => {
 
   const { eleicao } = req.body;
   let eleicaoData;
-  
+
   try {
     // Validar dados da eleição
     if (eleicao) {
       eleicaoData = JSON.parse(eleicao);
       const { error } = eleicaoSchema.validate(eleicaoData);
       if (error) {
-        return res.status(400).json({ 
-          error: 'Dados da eleição inválidos', 
-          details: error.details 
+        return res.status(400).json({
+          error: 'Dados da eleição inválidos',
+          details: error.details
         });
       }
     }
@@ -76,7 +76,7 @@ router.post('/csv', upload.single('csv'), async (req, res) => {
     // Processar CSV
     await new Promise((resolve, reject) => {
       fs.createReadStream(filePath, { encoding: 'utf8' })
-        .pipe(csv({ 
+        .pipe(csv({
           separator: ';',
           quote: '"',
           escape: '"',
@@ -85,19 +85,19 @@ router.post('/csv', upload.single('csv'), async (req, res) => {
         }))
         .on('data', (data) => {
           lineNumber++;
-          
+
           // Debug: mostrar primeiras linhas processadas
           if (lineNumber <= 3) {
             console.log(`🔍 Linha ${lineNumber} processada:`, Object.keys(data));
             console.log(`🔍 Dados da linha ${lineNumber}:`, data);
           }
-          
+
           try {
             // Limpar e processar dados
             const processedData = processarLinhaCSV(data, lineNumber);
             if (processedData) {
               results.push(processedData);
-              
+
               // Debug: mostrar primeiros dados processados
               if (results.length <= 3) {
                 console.log(`✅ Dados processados ${results.length}:`, processedData);
@@ -109,7 +109,7 @@ router.post('/csv', upload.single('csv'), async (req, res) => {
               console.log(`❌ Erro na linha ${lineNumber}:`, error.message);
               console.log(`❌ Dados da linha:`, data);
             }
-            
+
             errors.push({
               linha: lineNumber,
               erro: error.message,
@@ -122,7 +122,7 @@ router.post('/csv', upload.single('csv'), async (req, res) => {
     });
 
     if (results.length === 0) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Nenhum dado válido encontrado no CSV',
         erros: errors
       });
@@ -134,13 +134,13 @@ router.post('/csv', upload.single('csv'), async (req, res) => {
       const primeiroDado = results[0];
       console.log(`🔍 Detectando eleição automaticamente do CSV...`);
       console.log(`📊 Dados detectados: ${primeiroDado.ano} - ${primeiroDado.tipo} - ${primeiroDado.turno}º Turno`);
-      
+
       // Verificar se a eleição já existe
       const eleicaoExistente = await db.query(`
         SELECT id FROM eleicoes 
         WHERE ano = $1 AND tipo = $2 AND turno = $3
       `, [primeiroDado.ano, primeiroDado.tipo, primeiroDado.turno]);
-      
+
       if (eleicaoExistente.rows.length > 0) {
         eleicaoId = eleicaoExistente.rows[0].id;
         console.log(`✅ Eleição já existe com ID: ${eleicaoId}`);
@@ -188,13 +188,13 @@ router.post('/csv', upload.single('csv'), async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao processar CSV:', error);
-    
+
     // Limpar arquivo em caso de erro
     if (req.file && fs.existsSync(req.file.path)) {
       fs.unlinkSync(req.file.path);
     }
-    
-    res.status(500).json({ 
+
+    res.status(500).json({
       error: 'Erro ao processar CSV',
       message: error.message
     });
@@ -270,7 +270,7 @@ function processarLinhaCSV(data, lineNumber) {
     turno,
     dataEleicao,
     dataGeracao,
-    
+
     // Todas as 26 colunas do TSE
     dt_geracao: dtGeracao,
     hh_geracao: hhGeracao,
@@ -350,19 +350,19 @@ async function processarDados(dados, eleicaoId) {
     console.log(`🔄 Processando ${dadosEleicao.length} votos em lotes...`);
     const batchSize = 10000; // Processar 10.000 votos por vez (otimizado)
     const totalBatches = Math.ceil(dadosEleicao.length / batchSize);
-    
+
     for (let i = 0; i < dadosEleicao.length; i += batchSize) {
       const batch = dadosEleicao.slice(i, i + batchSize);
-      const currentBatch = Math.floor(i/batchSize) + 1;
+      const currentBatch = Math.floor(i / batchSize) + 1;
       const processedRecords = i + batch.length;
       const percentage = Math.round((processedRecords / dadosEleicao.length) * 100);
-      
+
       console.log(`🔄 Processando lote ${currentBatch}/${totalBatches} (${batch.length} votos) - ${percentage}% concluído...`);
-      
+
       // Otimização: buscar todos os municípios e candidatos do lote de uma vez
       const municipiosUnicos = [...new Set(batch.map(d => `${d.municipio}|${d.uf}`))];
       const candidatosUnicos = [...new Set(batch.map(d => `${d.numero}|${eleicaoId}`))];
-      
+
       // Buscar municípios em lote
       const municipiosMap = new Map();
       for (const municipioUf of municipiosUnicos) {
@@ -371,14 +371,14 @@ async function processarDados(dados, eleicaoId) {
           'SELECT id FROM municipios WHERE nome = $1 AND sigla_uf = $2',
           [municipio, uf]
         );
-        
+
         if (result.rows.length === 0) {
           // Criar município se não existir
           const codigoMunicipio = Math.abs(municipio.split('').reduce((a, b) => {
             a = ((a << 5) - a) + b.charCodeAt(0);
             return a & a;
           }, 0));
-          
+
           const newResult = await db.query(`
             INSERT INTO municipios (codigo, nome, sigla_uf)
             VALUES ($1, $2, $3)
@@ -392,7 +392,7 @@ async function processarDados(dados, eleicaoId) {
         }
         municipiosEncontrados++;
       }
-      
+
       // Buscar candidatos em lote
       const candidatosMap = new Map();
       for (const candidatoEleicao of candidatosUnicos) {
@@ -401,65 +401,65 @@ async function processarDados(dados, eleicaoId) {
           'SELECT id FROM candidatos WHERE numero = $1 AND eleicao_id = $2',
           [numero, eleicao]
         );
-        
+
         if (result.rows.length > 0) {
           candidatosMap.set(candidatoEleicao, result.rows[0].id);
         }
       }
-      
+
       // Preparar dados para inserção em lote
       const votosParaInserir = [];
-      
+
       for (const dado of batch) {
         const municipioKey = `${dado.municipio}|${dado.uf}`;
         const candidatoKey = `${dado.numero}|${eleicaoId}`;
-        
+
         const municipioId = municipiosMap.get(municipioKey);
         const candidatoId = candidatosMap.get(candidatoKey);
-        
+
         if (!candidatoId) {
           console.warn(`Candidato não encontrado: ${dado.numero} - ${dado.candidato}`);
           continue;
         }
-        
+
         // Debug: verificar se há valores undefined ou null
         if (!eleicaoId || !municipioId || !candidatoId || !dado.zona || !dado.secao) {
           console.warn(`⚠️ Valores inválidos: eleicaoId=${eleicaoId}, municipioId=${municipioId}, candidatoId=${candidatoId}, zona=${dado.zona}, secao=${dado.secao}`);
           continue;
         }
-        
+
         // Preparar dados do voto
         const votoData = [
-          eleicaoId, municipioId, candidatoId, dado.zona, dado.secao, 
+          eleicaoId, municipioId, candidatoId, dado.zona, dado.secao,
           dado.localVotacao, dado.enderecoLocal, dado.votos,
-          dado.dt_geracao, dado.hh_geracao, dado.ano_eleicao, dado.cd_tipo_eleicao, 
-          dado.nm_tipo_eleicao, dado.nr_turno, dado.cd_eleicao, dado.ds_eleicao, 
-          dado.dt_eleicao, dado.tp_abrangencia, dado.sg_uf, dado.sg_ue, dado.nm_ue, 
-          dado.cd_municipio, dado.nm_municipio, dado.nr_zona, dado.nr_secao, 
-          dado.cd_cargo, dado.ds_cargo, dado.nr_votavel, dado.nm_votavel, dado.qt_votos, 
+          dado.dt_geracao, dado.hh_geracao, dado.ano_eleicao, dado.cd_tipo_eleicao,
+          dado.nm_tipo_eleicao, dado.nr_turno, dado.cd_eleicao, dado.ds_eleicao,
+          dado.dt_eleicao, dado.tp_abrangencia, dado.sg_uf, dado.sg_ue, dado.nm_ue,
+          dado.cd_municipio, dado.nm_municipio, dado.nr_zona, dado.nr_secao,
+          dado.cd_cargo, dado.ds_cargo, dado.nr_votavel, dado.nm_votavel, dado.qt_votos,
           dado.nr_local_votacao, dado.sq_candidato, dado.nm_local_votacao, dado.ds_local_votacao_endereco
         ];
-        
+
         // Adicionar voto diretamente (não há duplicatas reais nos dados do TSE)
         votosParaInserir.push(votoData);
       }
-      
+
       // Votos já estão no array votosParaInserir
-      
+
       // Inserir votos em sub-lotes para evitar limite de parâmetros do PostgreSQL
       if (votosParaInserir.length > 0) {
         const subBatchSize = 200; // Máximo 200 votos por query (34 colunas × 200 = 6800 parâmetros)
-        
+
         for (let j = 0; j < votosParaInserir.length; j += subBatchSize) {
           const subBatch = votosParaInserir.slice(j, j + subBatchSize);
-          
+
           const values = subBatch.map((_, index) => {
             const offset = index * 34; // 34 colunas totais (8 originais + 26 novas)
             return `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10}, $${offset + 11}, $${offset + 12}, $${offset + 13}, $${offset + 14}, $${offset + 15}, $${offset + 16}, $${offset + 17}, $${offset + 18}, $${offset + 19}, $${offset + 20}, $${offset + 21}, $${offset + 22}, $${offset + 23}, $${offset + 24}, $${offset + 25}, $${offset + 26}, $${offset + 27}, $${offset + 28}, $${offset + 29}, $${offset + 30}, $${offset + 31}, $${offset + 32}, $${offset + 33}, $${offset + 34})`;
           }).join(',');
-          
+
           const flatValues = subBatch.flat();
-          
+
           await db.query(`
             INSERT INTO votos (
               eleicao_id, municipio_id, candidato_id, zona, secao, local_votacao, endereco_local, quantidade_votos,
@@ -501,19 +501,19 @@ async function processarDados(dados, eleicaoId) {
               ds_local_votacao_endereco = EXCLUDED.ds_local_votacao_endereco
           `, flatValues);
         }
-        
+
         votosInseridos += votosParaInserir.length;
       }
-      
+
       // Log de progresso detalhado
       console.log(`✅ Lote ${currentBatch}/${totalBatches} concluído: ${votosInseridos} votos inseridos até agora`);
-      
+
       // Pequena pausa entre lotes para não sobrecarregar
       if (i + batchSize < dadosEleicao.length) {
         await new Promise(resolve => setTimeout(resolve, 10));
       }
     }
-    
+
     console.log(`✅ Processamento finalizado: ${votosInseridos} votos, ${candidatosCriados} candidatos, ${municipiosEncontrados} municípios`);
   } else {
     console.log(`❌ Nenhum eleicaoId fornecido, não há dados para processar`);
@@ -544,16 +544,16 @@ router.post('/csv-progress', upload.single('csv'), async (req, res) => {
 
   const { eleicao } = req.body;
   let eleicaoData;
-  
+
   try {
     // Validar dados da eleição
     if (eleicao) {
       eleicaoData = JSON.parse(eleicao);
       const { error } = eleicaoSchema.validate(eleicaoData);
       if (error) {
-        return res.status(400).json({ 
-          error: 'Dados da eleição inválidos', 
-          details: error.details 
+        return res.status(400).json({
+          error: 'Dados da eleição inválidos',
+          details: error.details
         });
       }
     }
@@ -589,7 +589,7 @@ router.post('/csv-progress', upload.single('csv'), async (req, res) => {
     let totalLines = 0;
     await new Promise((resolve, reject) => {
       fs.createReadStream(filePath, { encoding: 'utf8' })
-        .pipe(csv({ 
+        .pipe(csv({
           separator: ';',
           quote: '"',
           escape: '"',
@@ -606,7 +606,7 @@ router.post('/csv-progress', upload.single('csv'), async (req, res) => {
     // Processar CSV com progresso
     await new Promise((resolve, reject) => {
       fs.createReadStream(filePath, { encoding: 'utf8' })
-        .pipe(csv({ 
+        .pipe(csv({
           separator: ';',
           quote: '"',
           escape: '"',
@@ -615,12 +615,12 @@ router.post('/csv-progress', upload.single('csv'), async (req, res) => {
         }))
         .on('data', (data) => {
           lineNumber++;
-          
+
           // Enviar progresso a cada 100 linhas ou no final
           if (lineNumber % 100 === 0 || lineNumber === totalLines) {
             sendProgress(lineNumber, totalLines, `Processando linha ${lineNumber} de ${totalLines}...`, 'reading');
           }
-          
+
           try {
             const processedData = processarLinhaCSV(data, lineNumber);
             if (processedData) {
@@ -704,12 +704,12 @@ router.post('/csv-progress', upload.single('csv'), async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao processar CSV:', error);
-    
+
     // Limpar arquivo em caso de erro
     if (req.file && fs.existsSync(req.file.path)) {
       fs.unlinkSync(req.file.path);
     }
-    
+
     res.write(`data: ${JSON.stringify({
       error: 'Erro ao processar CSV',
       message: error.message
@@ -727,7 +727,7 @@ async function processarDadosComProgresso(dados, eleicaoId, sendProgress) {
   if (eleicaoId) {
     // Agrupar dados por eleição
     const dadosEleicao = dados.filter(d => d.ano_eleicao && d.nm_tipo_eleicao && d.nr_turno);
-    
+
     if (dadosEleicao.length > 0) {
       sendProgress(0, dadosEleicao.length, 'Processando candidatos e municípios...', 'processing');
 
@@ -740,7 +740,7 @@ async function processarDadosComProgresso(dados, eleicaoId, sendProgress) {
         'SELECT id, numero, eleicao_id FROM candidatos WHERE eleicao_id = $1',
         [eleicaoId]
       );
-      
+
       candidatosExistentes.rows.forEach(c => {
         candidatosMap.set(`${c.numero}|${c.eleicao_id}`, c.id);
       });
@@ -749,7 +749,7 @@ async function processarDadosComProgresso(dados, eleicaoId, sendProgress) {
       const municipiosExistentes = await db.query(
         'SELECT id, codigo, nome, sigla_uf FROM municipios'
       );
-      
+
       municipiosExistentes.rows.forEach(m => {
         municipiosMap.set(`${m.nome}|${m.sigla_uf}`, m.id);
       });
@@ -807,7 +807,7 @@ async function processarDadosComProgresso(dados, eleicaoId, sendProgress) {
         'SELECT id, numero, eleicao_id FROM candidatos WHERE eleicao_id = $1',
         [eleicaoId]
       );
-      
+
       novosCandidatos.rows.forEach(c => {
         candidatosMap.set(`${c.numero}|${c.eleicao_id}`, c.id);
       });
@@ -815,7 +815,7 @@ async function processarDadosComProgresso(dados, eleicaoId, sendProgress) {
       const novosMunicipios = await db.query(
         'SELECT id, codigo, nome, sigla_uf FROM municipios'
       );
-      
+
       novosMunicipios.rows.forEach(m => {
         municipiosMap.set(`${m.nome}|${m.sigla_uf}`, m.id);
       });
@@ -823,7 +823,7 @@ async function processarDadosComProgresso(dados, eleicaoId, sendProgress) {
       // Processar votos em lotes
       const batchSize = 1000;
       const totalBatches = Math.ceil(dadosEleicao.length / batchSize);
-      
+
       for (let i = 0; i < dadosEleicao.length; i += batchSize) {
         const batch = dadosEleicao.slice(i, i + batchSize);
         const votosParaInserir = [];
@@ -840,13 +840,13 @@ async function processarDadosComProgresso(dados, eleicaoId, sendProgress) {
           }
 
           const votoData = [
-            eleicaoId, municipioId, candidatoId, dado.zona, dado.secao, 
+            eleicaoId, municipioId, candidatoId, dado.zona, dado.secao,
             dado.localVotacao, dado.enderecoLocal, dado.votos,
-            dado.dt_geracao, dado.hh_geracao, dado.ano_eleicao, dado.cd_tipo_eleicao, 
-            dado.nm_tipo_eleicao, dado.nr_turno, dado.cd_eleicao, dado.ds_eleicao, 
-            dado.dt_eleicao, dado.tp_abrangencia, dado.sg_uf, dado.sg_ue, dado.nm_ue, 
-            dado.cd_municipio, dado.nm_municipio, dado.nr_zona, dado.nr_secao, 
-            dado.cd_cargo, dado.ds_cargo, dado.nr_votavel, dado.nm_votavel, dado.qt_votos, 
+            dado.dt_geracao, dado.hh_geracao, dado.ano_eleicao, dado.cd_tipo_eleicao,
+            dado.nm_tipo_eleicao, dado.nr_turno, dado.cd_eleicao, dado.ds_eleicao,
+            dado.dt_eleicao, dado.tp_abrangencia, dado.sg_uf, dado.sg_ue, dado.nm_ue,
+            dado.cd_municipio, dado.nm_municipio, dado.nr_zona, dado.nr_secao,
+            dado.cd_cargo, dado.ds_cargo, dado.nr_votavel, dado.nm_votavel, dado.qt_votos,
             dado.nr_local_votacao, dado.sq_candidato, dado.nm_local_votacao, dado.ds_local_votacao_endereco
           ];
 
@@ -856,10 +856,10 @@ async function processarDadosComProgresso(dados, eleicaoId, sendProgress) {
         // Inserir votos em sub-lotes
         if (votosParaInserir.length > 0) {
           const subBatchSize = 200;
-          
+
           for (let j = 0; j < votosParaInserir.length; j += subBatchSize) {
             const subBatch = votosParaInserir.slice(j, j + subBatchSize);
-            
+
             // Remover duplicatas dentro do mesmo lote baseado na chave única
             const votosUnicos = new Map();
             subBatch.forEach(voto => {
@@ -868,13 +868,13 @@ async function processarDadosComProgresso(dados, eleicaoId, sendProgress) {
                 votosUnicos.set(chave, voto);
               }
             });
-            
+
             const votosFiltrados = Array.from(votosUnicos.values());
-            
+
             if (votosFiltrados.length > 0) {
               const values = votosFiltrados.map((_, index) => {
                 const offset = index * 34;
-                return `(${Array.from({length: 34}, (_, i) => `$${offset + i + 1}`).join(', ')})`;
+                return `(${Array.from({ length: 34 }, (_, i) => `$${offset + i + 1}`).join(', ')})`;
               }).join(', ');
 
               const flatValues = votosFiltrados.flat();
@@ -927,7 +927,7 @@ async function processarDadosComProgresso(dados, eleicaoId, sendProgress) {
 
         // Enviar progresso do lote
         const currentBatch = Math.floor(i / batchSize) + 1;
-        sendProgress(i + batch.length, dadosEleicao.length, 
+        sendProgress(i + batch.length, dadosEleicao.length,
           `Processando lote ${currentBatch} de ${totalBatches} (${votosInseridos} votos inseridos)...`, 'processing');
 
         // Pequena pausa para não sobrecarregar o banco
@@ -949,7 +949,7 @@ async function processarDadosComProgresso(dados, eleicaoId, sendProgress) {
 function processarLinhaCSVPerfil(data, lineNumber) {
   try {
     const dados = {};
-    
+
     // Mapear todas as colunas do CSV para o banco
     const mapeamento = {
       'DT_GERACAO': 'dt_geracao',
@@ -984,11 +984,11 @@ function processarLinhaCSVPerfil(data, lineNumber) {
       'QT_ELEITORES_DEFICIENCIA': 'qt_eleitores_deficiencia',
       'QT_ELEITORES_INC_NM_SOCIAL': 'qt_eleitores_inc_nm_social'
     };
-    
+
     // Converter dados
     for (const [csvCol, dbCol] of Object.entries(mapeamento)) {
       const valor = data[csvCol];
-      
+
       if (dbCol === 'dt_geracao') {
         // Converter data DD/MM/YYYY para YYYY-MM-DD
         if (valor && valor.includes('/')) {
@@ -1027,43 +1027,43 @@ async function processarDadosPerfil(dados, eleicaoId) {
 
   if (eleicaoId) {
     console.log(`🔄 Processando ${dados.length} registros de perfil para eleição ID ${eleicaoId}`);
-    
+
     // Processar em lotes para otimizar performance
     const batchSize = 1000;
     const totalBatches = Math.ceil(dados.length / batchSize);
-    
+
     for (let i = 0; i < dados.length; i += batchSize) {
       const batch = dados.slice(i, i + batchSize);
-      const currentBatch = Math.floor(i/batchSize) + 1;
-      
+      const currentBatch = Math.floor(i / batchSize) + 1;
+
       console.log(`🔄 Processando lote ${currentBatch}/${totalBatches} (${batch.length} registros)...`);
-      
+
       // Buscar municípios em lote
       const municipiosUnicos = [...new Set(batch.map(d => `${d.cd_municipio}|${d.sg_uf}`))];
       const municipiosMap = new Map();
-      
+
       for (const municipioUf of municipiosUnicos) {
         const [cdMunicipio, uf] = municipioUf.split('|');
         const result = await db.query(
           'SELECT id FROM municipios WHERE codigo = $1 AND sigla_uf = $2',
           [cdMunicipio, uf]
         );
-        
+
         if (result.rows.length > 0) {
           municipiosMap.set(municipioUf, result.rows[0].id);
           municipiosEncontrados++;
         }
       }
-      
+
       // Preparar dados para inserção
       const registrosParaInserir = [];
-      
+
       for (const dado of batch) {
         const municipioKey = `${dado.cd_municipio}|${dado.sg_uf}`;
         const municipioId = municipiosMap.get(municipioKey);
-        
+
         if (!municipioId) continue;
-        
+
         // Preparar dados do perfil - 32 valores (31 do CSV + municipio_id + eleicao_id)
         const perfilData = [
           dado.dt_geracao, dado.hh_geracao, dado.ano_eleicao, dado.sg_uf, dado.cd_municipio,
@@ -1075,24 +1075,24 @@ async function processarDadosPerfil(dados, eleicaoId) {
           dado.qt_eleitores_perfil, dado.qt_eleitores_biometria, dado.qt_eleitores_deficiencia, dado.qt_eleitores_inc_nm_social,
           municipioId, eleicaoId
         ];
-        
+
         registrosParaInserir.push(perfilData);
       }
-      
+
       // Inserir registros em sub-lotes
       if (registrosParaInserir.length > 0) {
         const subBatchSize = 100;
-        
+
         for (let j = 0; j < registrosParaInserir.length; j += subBatchSize) {
           const subBatch = registrosParaInserir.slice(j, j + subBatchSize);
-          
+
           const values = subBatch.map((_, index) => {
             const offset = index * 32;
             return `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10}, $${offset + 11}, $${offset + 12}, $${offset + 13}, $${offset + 14}, $${offset + 15}, $${offset + 16}, $${offset + 17}, $${offset + 18}, $${offset + 19}, $${offset + 20}, $${offset + 21}, $${offset + 22}, $${offset + 23}, $${offset + 24}, $${offset + 25}, $${offset + 26}, $${offset + 27}, $${offset + 28}, $${offset + 29}, $${offset + 30}, $${offset + 31}, $${offset + 32})`;
           }).join(',');
-          
+
           const flatValues = subBatch.flat();
-          
+
           await db.query(`
             INSERT INTO perfil_eleitor_secao (
               dt_geracao, hh_geracao, ano_eleicao, sg_uf, cd_municipio, nm_municipio,
@@ -1113,13 +1113,13 @@ async function processarDadosPerfil(dados, eleicaoId) {
               municipio_id = EXCLUDED.municipio_id
           `, flatValues);
         }
-        
+
         registrosInseridos += registrosParaInserir.length;
       }
-      
+
       console.log(`✅ Lote ${currentBatch}/${totalBatches} concluído: ${registrosInseridos} registros inseridos até agora`);
     }
-    
+
     console.log(`✅ Processamento finalizado: ${registrosInseridos} registros, ${municipiosEncontrados} municípios`);
   }
 
@@ -1154,17 +1154,17 @@ router.post('/perfil-eleitor', upload.single('csv'), async (req, res) => {
     // Função para buscar município com cache
     async function getMunicipioId(cdMunicipio, sgUf) {
       const key = `${cdMunicipio}|${sgUf}`;
-      
+
       if (municipiosCache.has(key)) {
         return municipiosCache.get(key);
       }
-      
+
       try {
         const result = await db.query(
           'SELECT id FROM municipios WHERE codigo = $1 AND sigla_uf = $2',
           [cdMunicipio, sgUf]
         );
-        
+
         if (result.rows.length > 0) {
           municipiosCache.set(key, result.rows[0].id);
           municipiosEncontrados++;
@@ -1212,7 +1212,7 @@ router.post('/perfil-eleitor', upload.single('csv'), async (req, res) => {
           dados.qt_eleitores_perfil, dados.qt_eleitores_biometria, dados.qt_eleitores_deficiencia, dados.qt_eleitores_inc_nm_social,
           municipioId, eleicaoId
         ]);
-        
+
         return true;
       } catch (error) {
         console.error(`❌ Erro ao inserir registro:`, error.message);
@@ -1220,76 +1220,88 @@ router.post('/perfil-eleitor', upload.single('csv'), async (req, res) => {
       }
     }
 
-    // Processar CSV em streaming com lotes pequenos para evitar problemas de memória
-    const batchSize = 500; // Processar 500 registros por vez
+    // Processar CSV em streaming com backpressure para evitar problemas de memória
+    const batchSize = 100; // Reduzido para 100 registros por vez
     let currentBatch = [];
-    
+    let isProcessing = false;
+
     await new Promise((resolve, reject) => {
-      fs.createReadStream(filePath, { encoding: 'utf8' })
-        .pipe(csv({ 
+      const stream = fs.createReadStream(filePath, { encoding: 'utf8' })
+        .pipe(csv({
           separator: ';',
           quote: '"',
           escape: '"',
           skipEmptyLines: true,
           skipLinesWithError: true
-        }))
-        .on('data', (data) => {
-          lineNumber++;
-          
-          try {
-            const processedData = processarLinhaCSVPerfil(data, lineNumber);
-            if (processedData) {
-              currentBatch.push(processedData);
-              
-              // Detectar ano da eleição no primeiro registro válido
-              if (!anoEleicao) {
-                anoEleicao = processedData.ano_eleicao;
-              }
-              
-              // Processar lote quando atingir o tamanho
-              if (currentBatch.length >= batchSize) {
-                // Processar de forma síncrona para evitar acúmulo
-                processarLote(currentBatch).catch(error => {
-                  console.error('❌ Erro ao processar lote:', error.message);
-                  registrosIgnorados += currentBatch.length;
-                });
-                currentBatch = [];
-              }
-              
-            } else {
-              registrosIgnorados++;
+        }));
+
+      stream.on('data', async (data) => {
+        lineNumber++;
+
+        try {
+          const processedData = processarLinhaCSVPerfil(data, lineNumber);
+          if (processedData) {
+            currentBatch.push(processedData);
+
+            // Detectar ano da eleição no primeiro registro válido
+            if (!anoEleicao) {
+              anoEleicao = processedData.ano_eleicao;
             }
-            
-          } catch (error) {
-            errors.push({
-              linha: lineNumber,
-              erro: error.message
-            });
+
+            // Processar lote quando atingir o tamanho - COM BACKPRESSURE
+            if (currentBatch.length >= batchSize && !isProcessing) {
+              isProcessing = true;
+              stream.pause(); // Pausar stream enquanto processa
+
+              const batchToProcess = currentBatch;
+              currentBatch = []; // Limpar referência imediatamente
+
+              try {
+                await processarLote(batchToProcess);
+              } catch (error) {
+                console.error('❌ Erro ao processar lote:', error.message);
+                registrosIgnorados += batchToProcess.length;
+              }
+
+              isProcessing = false;
+              stream.resume(); // Retomar stream
+            }
+
+          } else {
             registrosIgnorados++;
           }
-        })
+
+        } catch (error) {
+          errors.push({
+            linha: lineNumber,
+            erro: error.message
+          });
+          registrosIgnorados++;
+        }
+      })
         .on('end', async () => {
           // Processar lote final
           if (currentBatch.length > 0) {
             await processarLote(currentBatch);
+            currentBatch = []; // Limpar referência
           }
-          
+
           console.log(`✅ Processamento streaming concluído: ${registrosProcessados} registros processados`);
           resolve();
         })
         .on('error', reject);
     });
-    
+
     // Função para processar um lote de registros (método otimizado)
     async function processarLote(batch) {
       try {
         console.log(`🔄 Processando lote de ${batch.length} registros...`);
-        
+
         // Verificar/criar eleição se necessário
         if (!eleicaoId && anoEleicao) {
           try {
             const eleicao = await db.query('SELECT id FROM eleicoes WHERE ano = $1', [anoEleicao]);
-            
+
             if (eleicao.rows.length === 0) {
               console.log(`⚠️  Eleição ${anoEleicao} não encontrada. Criando...`);
               await db.query(
@@ -1298,33 +1310,33 @@ router.post('/perfil-eleitor', upload.single('csv'), async (req, res) => {
               );
               console.log(`✅ Eleição ${anoEleicao} criada.`);
             }
-            
+
             eleicaoId = eleicao.rows[0]?.id || (await db.query('SELECT id FROM eleicoes WHERE ano = $1', [anoEleicao])).rows[0].id;
           } catch (error) {
             console.error('❌ Erro ao verificar/criar eleição:', error.message);
             return;
           }
         }
-        
+
         // Buscar municípios em lote (otimização)
         const municipiosUnicos = [...new Set(batch.map(d => `${d.cd_municipio}|${d.sg_uf}`))];
-        
+
         // Buscar municípios em lote com retry
         for (const municipioUf of municipiosUnicos) {
           const [cdMunicipio, uf] = municipioUf.split('|');
           const key = `${cdMunicipio}|${uf}`;
-          
+
           if (!municipiosCache.has(key)) {
             let tentativas = 0;
             let sucesso = false;
-            
+
             while (tentativas < 3 && !sucesso) {
               try {
                 const result = await db.query(
                   'SELECT id FROM municipios WHERE codigo = $1 AND sigla_uf = $2',
                   [cdMunicipio, uf]
                 );
-                
+
                 if (result.rows.length > 0) {
                   municipiosCache.set(key, result.rows[0].id);
                   municipiosEncontrados++;
@@ -1340,19 +1352,19 @@ router.post('/perfil-eleitor', upload.single('csv'), async (req, res) => {
             }
           }
         }
-        
+
         // Preparar dados para inserção em lote
         const registrosParaInserir = [];
-        
+
         for (const dados of batch) {
           const municipioKey = `${dados.cd_municipio}|${dados.sg_uf}`;
           const municipioId = municipiosCache.get(municipioKey);
-          
+
           if (!municipioId) {
             registrosIgnorados++;
             continue;
           }
-          
+
           // Preparar dados do perfil - 33 valores (excluindo id e created_at)
           const perfilData = [
             dados.dt_geracao, dados.hh_geracao, dados.ano_eleicao, dados.sg_uf, dados.cd_municipio,
@@ -1364,28 +1376,28 @@ router.post('/perfil-eleitor', upload.single('csv'), async (req, res) => {
             dados.qt_eleitores_perfil, dados.qt_eleitores_biometria, dados.qt_eleitores_deficiencia, dados.qt_eleitores_inc_nm_social,
             municipioId, eleicaoId
           ];
-          
+
           registrosParaInserir.push(perfilData);
         }
-        
+
         // Inserir registros em sub-lotes menores para evitar timeout
         if (registrosParaInserir.length > 0) {
           const subBatchSize = 25; // Reduzido para 25 registros por query
-          
+
           for (let j = 0; j < registrosParaInserir.length; j += subBatchSize) {
             const subBatch = registrosParaInserir.slice(j, j + subBatchSize);
-            
+
             const values = subBatch.map((_, index) => {
               const offset = index * 33; // 33 valores por registro
               return `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10}, $${offset + 11}, $${offset + 12}, $${offset + 13}, $${offset + 14}, $${offset + 15}, $${offset + 16}, $${offset + 17}, $${offset + 18}, $${offset + 19}, $${offset + 20}, $${offset + 21}, $${offset + 22}, $${offset + 23}, $${offset + 24}, $${offset + 25}, $${offset + 26}, $${offset + 27}, $${offset + 28}, $${offset + 29}, $${offset + 30}, $${offset + 31}, $${offset + 32}, $${offset + 33})`;
             }).join(',');
-            
+
             const flatValues = subBatch.flat();
-            
+
             // Inserir com retry
             let tentativas = 0;
             let sucesso = false;
-            
+
             while (tentativas < 3 && !sucesso) {
               try {
                 await db.query(`
@@ -1419,15 +1431,15 @@ router.post('/perfil-eleitor', upload.single('csv'), async (req, res) => {
               }
             }
           }
-          
+
           registrosInseridos += registrosParaInserir.length;
         }
-        
+
         registrosProcessados += batch.length;
-        
+
         // Log de progresso
         console.log(`✅ Lote processado: ${registrosProcessados} registros processados, ${registrosInseridos} inseridos`);
-        
+
       } catch (error) {
         console.error('❌ Erro ao processar lote:', error.message);
         registrosIgnorados += batch.length;
@@ -1452,7 +1464,7 @@ router.post('/perfil-eleitor', upload.single('csv'), async (req, res) => {
 
   } catch (error) {
     console.error('❌ Erro durante o processamento:', error);
-    
+
     // Limpar arquivo temporário em caso de erro
     if (req.file && req.file.path) {
       try {
@@ -1461,10 +1473,10 @@ router.post('/perfil-eleitor', upload.single('csv'), async (req, res) => {
         console.error('Erro ao remover arquivo temporário:', unlinkError);
       }
     }
-    
-    res.status(500).json({ 
+
+    res.status(500).json({
       error: 'Erro interno do servidor',
-      message: error.message 
+      message: error.message
     });
   }
 });

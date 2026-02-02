@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
+    "dev-large": "node --max-old-space-size=8192 server.js",
     "init-db": "node scripts/init-database.js",
     "import-csv": "node scripts/import-csv.js",
     "import-large-csv": "node scripts/import-large-csv.js"

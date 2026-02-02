@@ -17,6 +17,8 @@ const candidatosRoutes = require('./routes/candidatos');
 const analiseComplementarRoutes = require('./routes/analise-complementar');
 const regionaisRoutes = require('./routes/regionais');
 const fotosCandidatosRoutes = require('./routes/fotos-candidatos');
+const demograficoRoutes = require('./routes/demografico');
+const correlacaoRegionalRoutes = require('./routes/correlacao-regional');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -82,6 +84,8 @@ app.use('/api/analise-complementar', analiseComplementarRoutes);
 app.use('/api/regionais', regionaisRoutes);
 app.use('/api/fotos-candidatos', fotosCandidatosRoutes);
 app.use('/api/ranking', require('./routes/ranking'));
+app.use('/api/demografico', demograficoRoutes);
+app.use('/api/correlacao-regional', correlacaoRegionalRoutes);
 
 // Rota principal - servir a aplicação web
 app.get('/', (req, res) => {

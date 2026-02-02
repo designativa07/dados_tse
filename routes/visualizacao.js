@@ -7,27 +7,27 @@ const Joi = require('joi');
 router.get('/configuracoes', async (req, res) => {
   try {
     const { tipo, ativo } = req.query;
-    
+
     let whereClause = '';
     let params = [];
     let paramCount = 0;
-    
+
     if (tipo) {
       whereClause += ` WHERE tipo = $${++paramCount}`;
       params.push(tipo);
     }
-    
+
     if (ativo !== undefined) {
       whereClause += whereClause ? ` AND ativo = $${++paramCount}` : ` WHERE ativo = $${++paramCount}`;
       params.push(ativo === 'true');
     }
-    
+
     const result = await db.query(`
       SELECT * FROM configuracoes_visualizacao 
       ${whereClause}
       ORDER BY nome
     `, params);
-    
+
     res.json(result.rows);
   } catch (error) {
     console.error('Erro ao buscar configurações:', error);
@@ -39,17 +39,17 @@ router.get('/configuracoes', async (req, res) => {
 router.post('/configuracoes', async (req, res) => {
   try {
     const { nome, tipo, configuracoes, ativo = true } = req.body;
-    
+
     if (!nome || !tipo || !configuracoes) {
       return res.status(400).json({ error: 'Nome, tipo e configurações são obrigatórios' });
     }
-    
+
     const result = await db.query(`
       INSERT INTO configuracoes_visualizacao (nome, tipo, configuracoes, ativo)
       VALUES ($1, $2, $3, $4)
       RETURNING *
     `, [nome, tipo, JSON.stringify(configuracoes), ativo]);
-    
+
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('Erro ao criar configuração:', error);
@@ -60,7 +60,7 @@ router.post('/configuracoes', async (req, res) => {
 // GET /api/visualizacao/tabela - Dados para tabela configurável
 router.get('/tabela', async (req, res) => {
   try {
-    const { 
+    const {
       eleicao_id,
       colunas = 'municipio,votos,candidato',
       ordenar_por = 'votos',
@@ -68,14 +68,14 @@ router.get('/tabela', async (req, res) => {
       limite = 100,
       pagina = 1
     } = req.query;
-    
+
     if (!eleicao_id) {
       return res.status(400).json({ error: 'eleicao_id é obrigatório' });
     }
-    
+
     const offset = (pagina - 1) * limite;
     const colunasArray = colunas.split(',').map(c => c.trim());
-    
+
     // Mapear colunas para campos do banco
     const colunasMap = {
       'municipio': 'm.nome as municipio',
@@ -94,15 +94,15 @@ router.get('/tabela', async (req, res) => {
       'tipo': 'e.tipo as eleicao_tipo',
       'turno': 'e.turno as eleicao_turno'
     };
-    
+
     // Sempre incluir candidato_id para links
     const selectFields = colunasArray.map(col => colunasMap[col] || col).join(', ') + ', c.id as candidato_id';
-    
+
     // Validar ordenação
     const allowedOrderFields = ['votos', 'municipio', 'candidato', 'zona', 'secao'];
     const orderField = allowedOrderFields.includes(ordenar_por) ? ordenar_por : 'votos';
     const orderDirection = ordem.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
-    
+
     // Mapear campo de ordenação para campo real do banco
     const orderFieldMap = {
       'votos': 'v.quantidade_votos',
@@ -111,9 +111,9 @@ router.get('/tabela', async (req, res) => {
       'zona': 'v.zona',
       'secao': 'v.secao'
     };
-    
+
     const realOrderField = orderFieldMap[orderField] || 'v.quantidade_votos';
-    
+
     const query = `
       SELECT 
         ${selectFields}
@@ -125,16 +125,16 @@ router.get('/tabela', async (req, res) => {
       ORDER BY ${realOrderField} ${orderDirection}
       LIMIT $2 OFFSET $3
     `;
-    
+
     const result = await db.query(query, [eleicao_id, limite, offset]);
-    
+
     // Contar total para paginação
     const countResult = await db.query(`
       SELECT COUNT(*) FROM votos v WHERE v.eleicao_id = $1
     `, [eleicao_id]);
-    
+
     const total = parseInt(countResult.rows[0].count);
-    
+
     res.json({
       data: result.rows,
       colunas: colunasArray,
@@ -154,7 +154,7 @@ router.get('/tabela', async (req, res) => {
 // GET /api/visualizacao/grafico - Dados para gráficos
 router.get('/grafico', async (req, res) => {
   try {
-    const { 
+    const {
       eleicao_id,
       tipo = 'bar',
       eixo_x = 'municipio',
@@ -163,16 +163,16 @@ router.get('/grafico', async (req, res) => {
       cargo = '',
       limite = 20
     } = req.query;
-    
+
     if (!eleicao_id) {
       return res.status(400).json({ error: 'eleicao_id é obrigatório' });
     }
-    
+
     let groupByField, selectFields;
     let whereConditions = ['v.eleicao_id = $1'];
     let params = [eleicao_id];
     let paramCount = 1;
-    
+
     if (agrupar_por === 'municipio') {
       groupByField = 'm.id, m.nome';
       selectFields = 'm.nome as label, SUM(v.quantidade_votos) as value';
@@ -185,17 +185,17 @@ router.get('/grafico', async (req, res) => {
     } else {
       return res.status(400).json({ error: 'agrupar_por deve ser municipio, candidato ou cargo' });
     }
-    
+
     // Adicionar filtro por cargo se especificado
     if (cargo) {
       whereConditions.push(`UPPER(c.cargo) = UPPER($${++paramCount})`);
       params.push(cargo);
     }
-    
+
     const whereClause = `WHERE ${whereConditions.join(' AND ')}`;
-    
+
     let query;
-    
+
     // Query unificada para todos os tipos de agrupamento
     query = `
       SELECT 
@@ -209,9 +209,9 @@ router.get('/grafico', async (req, res) => {
       LIMIT $${++paramCount}
     `;
     params.push(limite);
-    
+
     const result = await db.query(query, params);
-    
+
     res.json({
       tipo,
       dados: result.rows,
@@ -229,25 +229,25 @@ router.get('/grafico', async (req, res) => {
 // GET /api/visualizacao/mapa - Dados para mapa de calor
 router.get('/mapa', async (req, res) => {
   try {
-    const { 
+    const {
       eleicao_id,
       candidato_id,
       tipo = 'heatmap'
     } = req.query;
-    
+
     if (!eleicao_id) {
       return res.status(400).json({ error: 'eleicao_id é obrigatório' });
     }
-    
+
     let whereClause = 'WHERE v.eleicao_id = $1';
     let params = [eleicao_id];
     let paramCount = 1;
-    
+
     if (candidato_id) {
       whereClause += ` AND v.candidato_id = $${++paramCount}`;
       params.push(candidato_id);
     }
-    
+
     const query = `
       SELECT 
         m.nome as municipio,
@@ -265,12 +265,13 @@ router.get('/mapa', async (req, res) => {
       JOIN eleicoes e ON v.eleicao_id = e.id
       ${whereClause}
       GROUP BY m.id, m.nome, m.latitude, m.longitude, c.nome, c.cargo, c.numero, e.ano, e.tipo
-      HAVING m.latitude IS NOT NULL AND m.longitude IS NOT NULL
       ORDER BY total_votos DESC
     `;
-    
+
     const result = await db.query(query, params);
-    
+
+    // Frontend agora usa coordenadas hardcoded, então não filtramos aqui
+    // Apenas retornamos todos os dados com os votos por município
     res.json({
       tipo,
       dados: result.rows,
@@ -287,28 +288,28 @@ router.get('/mapa', async (req, res) => {
 router.get('/estatisticas', async (req, res) => {
   try {
     const { eleicao_id, candidato_id, municipio_id } = req.query;
-    
+
     let whereConditions = [];
     let params = [];
     let paramCount = 0;
-    
+
     if (eleicao_id) {
       whereConditions.push(`v.eleicao_id = $${++paramCount}`);
       params.push(eleicao_id);
     }
-    
+
     if (candidato_id) {
       whereConditions.push(`v.candidato_id = $${++paramCount}`);
       params.push(candidato_id);
     }
-    
+
     if (municipio_id) {
       whereConditions.push(`v.municipio_id = $${++paramCount}`);
       params.push(municipio_id);
     }
-    
+
     const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
-    
+
     const query = `
       SELECT 
         COUNT(*) as total_registros,
@@ -324,9 +325,9 @@ router.get('/estatisticas', async (req, res) => {
       FROM votos v
       ${whereClause}
     `;
-    
+
     const result = await db.query(query, params);
-    
+
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Erro ao buscar estatísticas:', error);
@@ -337,44 +338,44 @@ router.get('/estatisticas', async (req, res) => {
 // POST /api/visualizacao/exportar - Exportar dados
 router.post('/exportar', async (req, res) => {
   try {
-    const { 
+    const {
       eleicao_id,
       formato = 'csv',
       colunas = ['municipio', 'votos', 'candidato'],
       filtros = {}
     } = req.body;
-    
+
     if (!eleicao_id) {
       return res.status(400).json({ error: 'eleicao_id é obrigatório' });
     }
-    
+
     // Construir query baseada nos filtros
     let whereConditions = ['v.eleicao_id = $1'];
     let params = [eleicao_id];
     let paramCount = 1;
-    
+
     if (filtros.candidato_id) {
       whereConditions.push(`v.candidato_id = $${++paramCount}`);
       params.push(filtros.candidato_id);
     }
-    
+
     if (filtros.municipio_id) {
       whereConditions.push(`v.municipio_id = $${++paramCount}`);
       params.push(filtros.municipio_id);
     }
-    
+
     if (filtros.min_votos) {
       whereConditions.push(`v.quantidade_votos >= $${++paramCount}`);
       params.push(filtros.min_votos);
     }
-    
+
     if (filtros.max_votos) {
       whereConditions.push(`v.quantidade_votos <= $${++paramCount}`);
       params.push(filtros.max_votos);
     }
-    
+
     const whereClause = `WHERE ${whereConditions.join(' AND ')}`;
-    
+
     // Mapear colunas
     const colunasMap = {
       'municipio': 'm.nome as municipio',
@@ -390,9 +391,9 @@ router.post('/exportar', async (req, res) => {
       'tipo': 'e.tipo as eleicao_tipo',
       'turno': 'e.turno as eleicao_turno'
     };
-    
+
     const selectFields = colunas.map(col => colunasMap[col] || col).join(', ');
-    
+
     const query = `
       SELECT 
         ${selectFields}
@@ -403,21 +404,21 @@ router.post('/exportar', async (req, res) => {
       ${whereClause}
       ORDER BY v.quantidade_votos DESC
     `;
-    
+
     const result = await db.query(query, params);
-    
+
     if (formato === 'csv') {
       // Gerar CSV
       const csvHeader = colunas.join(';');
-      const csvRows = result.rows.map(row => 
+      const csvRows = result.rows.map(row =>
         colunas.map(col => {
           const value = row[col] || '';
           return `"${value.toString().replace(/"/g, '""')}"`;
         }).join(';')
       );
-      
+
       const csvContent = [csvHeader, ...csvRows].join('\n');
-      
+
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', 'attachment; filename="dados_exportados.csv"');
       res.send(csvContent);

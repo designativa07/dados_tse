@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
     <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
 <body>
@@ -42,10 +43,7 @@
                         <i class="fas fa-map"></i>
                         Mapas
                     </button>
-                    <button class="nav-btn" data-tab="relatorios">
-                        <i class="fas fa-chart-bar"></i>
-                        Relatórios
-                    </button>
+
                     <button class="nav-btn" data-tab="regionais">
                         <i class="fas fa-map-marked-alt"></i>
                         Análise Regional
@@ -701,51 +699,143 @@
                 </div>
             </div>
 
-            <!-- Perfil do Eleitor Tab -->
+            <!-- Perfil do Eleitor Tab - Dashboard Demográfico -->
             <div id="eleitor" class="tab-content">
                 <div class="eleitor-header">
-                    <h2>Perfil do Eleitor</h2>
-                    <p>Análise comparativa do perfil dos eleitores de Santa Catarina (2018 vs 2022)</p>
+                    <h2>📊 Análise Demográfica do Eleitorado</h2>
+                    <p>Perfil dos eleitores de Santa Catarina - Comparativo 2018 vs 2022</p>
                 </div>
 
-                <div class="eleitor-content">
-                    <div class="eleitor-info">
-                        <div class="info-card">
-                            <i class="fas fa-info-circle"></i>
-                            <h3>Dados Disponíveis</h3>
-                            <p>Análise detalhada do perfil dos eleitores por gênero, faixa etária, escolaridade e estado
-                                civil</p>
-                        </div>
-                        <div class="info-card">
-                            <i class="fas fa-chart-line"></i>
-                            <h3>Comparação Temporal</h3>
-                            <p>Evolução do perfil eleitoral entre as eleições de 2018 e 2022</p>
-                        </div>
-                        <div class="info-card">
-                            <i class="fas fa-filter"></i>
-                            <h3>Filtros Avançados</h3>
-                            <p>Análise por município, zona eleitoral e outras características</p>
+                <!-- Cards de Estatísticas Rápidas -->
+                <div class="demografico-stats-cards" id="demografico-stats-cards">
+                    <div class="stat-card-demo" id="card-total-2022">
+                        <div class="stat-icon"><i class="fas fa-users"></i></div>
+                        <div class="stat-value" id="total-eleitores-2022">--</div>
+                        <div class="stat-label">Eleitores 2022</div>
+                    </div>
+                    <div class="stat-card-demo" id="card-total-2018">
+                        <div class="stat-icon"><i class="fas fa-users"></i></div>
+                        <div class="stat-value" id="total-eleitores-2018">--</div>
+                        <div class="stat-label">Eleitores 2018</div>
+                    </div>
+                    <div class="stat-card-demo highlight" id="card-crescimento">
+                        <div class="stat-icon"><i class="fas fa-chart-line"></i></div>
+                        <div class="stat-value" id="crescimento-percentual">--</div>
+                        <div class="stat-label">Crescimento</div>
+                    </div>
+                    <div class="stat-card-demo" id="card-municipios">
+                        <div class="stat-icon"><i class="fas fa-city"></i></div>
+                        <div class="stat-value" id="total-municipios">295</div>
+                        <div class="stat-label">Municípios</div>
+                    </div>
+                </div>
+
+                <!-- Botão de Atualizar -->
+                <div class="demografico-actions">
+                    <button class="btn btn-primary" onclick="dashboard.carregarDemografico()">
+                        <i class="fas fa-sync-alt"></i>
+                        Atualizar Dados
+                    </button>
+                    <select id="demografico-ano" class="form-select"
+                        style="width: auto; display: inline-block; margin-left: 10px;">
+                        <option value="">Ambos os anos</option>
+                        <option value="2022" selected>2022</option>
+                        <option value="2018">2018</option>
+                    </select>
+                </div>
+
+                <!-- Gráficos em Grid -->
+                <div class="demografico-charts-grid">
+                    <!-- Gráfico de Gênero -->
+                    <div class="chart-container-demo">
+                        <h3><i class="fas fa-venus-mars"></i> Distribuição por Gênero</h3>
+                        <div class="chart-wrapper-demo">
+                            <canvas id="chart-genero"></canvas>
                         </div>
                     </div>
 
-                    <div class="eleitor-actions">
-                        <button class="btn btn-primary" onclick="abrirPaginaEleitor()">
-                            <i class="fas fa-user-check"></i>
-                            Abrir Análise Completa
-                        </button>
-                        <button class="btn btn-secondary" onclick="carregarEstatisticasEleitor()">
-                            <i class="fas fa-chart-bar"></i>
-                            Carregar Estatísticas
-                        </button>
+                    <!-- Gráfico de Escolaridade -->
+                    <div class="chart-container-demo">
+                        <h3><i class="fas fa-graduation-cap"></i> Distribuição por Escolaridade</h3>
+                        <div class="chart-wrapper-demo">
+                            <canvas id="chart-escolaridade"></canvas>
+                        </div>
                     </div>
 
-                    <div class="eleitor-preview" id="eleitor-preview">
-                        <div class="preview-placeholder">
-                            <i class="fas fa-user-check"></i>
-                            <h3>Análise do Perfil do Eleitor</h3>
-                            <p>Clique em "Abrir Análise Completa" para visualizar os gráficos e estatísticas detalhadas
-                            </p>
+                    <!-- Gráfico de Faixa Etária -->
+                    <div class="chart-container-demo wide">
+                        <h3><i class="fas fa-birthday-cake"></i> Distribuição por Faixa Etária (Comparativo 2018 vs
+                            2022)</h3>
+                        <div class="chart-wrapper-demo">
+                            <canvas id="chart-faixa-etaria"></canvas>
                         </div>
+                    </div>
+
+                    <!-- Gráfico de Estado Civil -->
+                    <div class="chart-container-demo">
+                        <h3><i class="fas fa-ring"></i> Distribuição por Estado Civil</h3>
+                        <div class="chart-wrapper-demo">
+                            <canvas id="chart-estado-civil"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Ranking de Municípios -->
+                <div class="demografico-ranking">
+                    <h3><i class="fas fa-trophy"></i> Top 10 Municípios por Crescimento de Eleitores</h3>
+                    <div class="table-wrapper">
+                        <table class="data-table ranking-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Município</th>
+                                    <th>Eleitores 2018</th>
+                                    <th>Eleitores 2022</th>
+                                    <th>Crescimento</th>
+                                    <th>% Crescimento</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ranking-crescimento-body">
+                                <tr>
+                                    <td colspan="6" class="text-center">
+                                        <i class="fas fa-spinner fa-spin"></i> Carregando dados...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Mapa Temático por Indicador -->
+                <div class="demografico-ranking" style="margin-top: 25px;">
+                    <h3><i class="fas fa-map-marked-alt"></i> Mapa Temático por Indicador Demográfico</h3>
+                    <div class="mapa-tematico-controls">
+                        <select id="indicador-tematico" class="form-select" onchange="dashboard.carregarMapaTematico()">
+                            <option value="escolaridade">% Ensino Superior</option>
+                            <option value="jovens">% Jovens (16-24 anos)</option>
+                            <option value="idosos">% Idosos (60+)</option>
+                            <option value="mulheres">% Mulheres</option>
+                        </select>
+                    </div>
+                    <div class="table-wrapper" style="margin-top: 15px;">
+                        <table class="data-table ranking-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Município</th>
+                                    <th>Indicador</th>
+                                    <th>Total Eleitores</th>
+                                    <th>Visualização</th>
+                                </tr>
+                            </thead>
+                            <tbody id="mapa-tematico-body">
+                                <tr>
+                                    <td colspan="5" class="text-center">
+                                        <i class="fas fa-spinner fa-spin"></i> Selecione um indicador e aguarde...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -830,6 +920,68 @@
                 </div>
             </div>
 
+            <!-- Regional Analysis Tab -->
+            <div id="regionais" class="tab-content">
+                <div class="ranking-header">
+                    <h2>Análise Regional PSDB</h2>
+                    <p>Comparativo de desempenho entre regionais e identificação de potencial de crescimento</p>
+                </div>
+
+                <div class="perfil-card full-width" style="margin-bottom: 30px;">
+                    <h3><i class="fas fa-chart-pie"></i> Comparativo de Regionais</h3>
+                    <div class="table-wrapper">
+                        <table class="data-table ranking-table">
+                            <thead>
+                                <tr>
+                                    <th>Regional</th>
+                                    <th>Municípios</th>
+                                    <th>Filiados (2024)</th>
+                                    <th>População</th>
+                                    <th>Taxa Filiação (por 1000)</th>
+                                    <th>Performance</th>
+                                </tr>
+                            </thead>
+                            <tbody id="regional-comparativo-body">
+                                <tr>
+                                    <td colspan="6" class="text-center">
+                                        <i class="fas fa-spinner fa-spin"></i> Carregando dados regionais...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="perfil-card full-width">
+                    <h3><i class="fas fa-seedling"></i> Potencial de Crescimento</h3>
+                    <p class="section-subtitle">Municípios com perfil demográfico favorável (Alta Escolaridade + Jovens)
+                        mas baixa taxa de filiação</p>
+
+                    <div class="table-wrapper">
+                        <table class="data-table ranking-table">
+                            <thead>
+                                <tr>
+                                    <th>Município</th>
+                                    <th>Regional</th>
+                                    <th>Eleitores</th>
+                                    <th>% Superior</th>
+                                    <th>% Jovens (25-44)</th>
+                                    <th>Filiados</th>
+                                    <th>Potencial</th>
+                                </tr>
+                            </thead>
+                            <tbody id="regional-potencial-body">
+                                <tr>
+                                    <td colspan="7" class="text-center">
+                                        <i class="fas fa-spinner fa-spin"></i> Carregando análise de potencial...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
             <!-- Mapas Tab -->
             <div id="mapas" class="tab-content">
                 <div class="mapas-header">
@@ -902,28 +1054,7 @@
                 </div>
             </div>
 
-            <!-- Relatórios Tab -->
-            <div id="relatorios" class="tab-content">
-                <div class="relatorios-header">
-                    <h2>Relatórios</h2>
-                    <p>Crie e gerencie relatórios personalizados</p>
-                </div>
 
-                <div class="relatorios-actions">
-                    <button class="btn btn-primary" onclick="criarRelatorio()">
-                        <i class="fas fa-plus"></i>
-                        Novo Relatório
-                    </button>
-                    <button class="btn btn-secondary" onclick="carregarRelatorios()">
-                        <i class="fas fa-refresh"></i>
-                        Atualizar Lista
-                    </button>
-                </div>
-
-                <div class="relatorios-list" id="relatorios-list">
-                    <!-- Lista de relatórios será carregada aqui -->
-                </div>
-            </div>
 
             <!-- Análise Regional Tab -->
             <div id="regionais" class="tab-content">
@@ -1146,6 +1277,7 @@
         }
     </script>
     <script src="ranking.js"></script>
+    <script src="dashboard-demografico.js"></script>
 </body>
 
 </html>
