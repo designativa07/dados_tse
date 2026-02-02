@@ -27,7 +27,61 @@ document.addEventListener('DOMContentLoaded', () => {
             exportarRankingExcel();
         });
     }
+
+    // Toggle Ranking Mode
+    const radioButtons = document.querySelectorAll('input[name="ranking-tipo"]');
+    radioButtons.forEach(radio => {
+        radio.addEventListener('change', toggleRankingMode);
+    });
+
+    // Populate Regionals on load
+    carregarListaRegionais();
 });
+
+async function carregarListaRegionais() {
+    try {
+        const response = await fetch('/api/regionais/regionais-psdb');
+        const json = await response.json();
+        if (json.success) {
+            const select = document.getElementById('ranking-select-regional');
+            if (select) {
+                // Keep the first option (Todas)
+                select.innerHTML = '<option value="">Todas as Regionais</option>';
+                json.data.forEach(reg => {
+                    const option = document.createElement('option');
+                    option.value = reg.id;
+                    option.textContent = reg.nome;
+                    select.appendChild(option);
+                });
+            }
+        }
+    } catch (e) {
+        console.error('Erro ao carregar regionais:', e);
+    }
+}
+
+function toggleRankingMode() {
+    const mode = document.querySelector('input[name="ranking-tipo"]:checked').value;
+    const municipioInput = document.getElementById('ranking-busca-municipio');
+    const regionalSelect = document.getElementById('ranking-select-regional');
+    const label = document.getElementById('ranking-filtro-label');
+
+    if (mode === 'regional') {
+        municipioInput.style.display = 'none';
+        regionalSelect.style.display = 'block';
+        label.textContent = 'Filtrar Regional';
+    } else {
+        municipioInput.style.display = 'block';
+        regionalSelect.style.display = 'none';
+        label.textContent = 'Filtrar Município';
+    }
+
+    // Limpar os resultados ao trocar de modo para evitar confusão
+    const container = document.getElementById('ranking-results');
+    container.innerHTML = '<div class="placeholder-msg"><p>Clique em Carregar Ranking para atualizar.</p></div>';
+    rankingData = [];
+    rankingFilteredData = [];
+}
 
 function toggleLayout() {
     const container = document.getElementById('ranking-results');
@@ -56,7 +110,7 @@ async function carregarRanking() {
     const container = document.getElementById('ranking-results');
     const loading = document.getElementById('ranking-loading');
     const eleicaoSelect = document.getElementById('ranking-eleicao');
-    const municipioInput = document.getElementById('ranking-busca-municipio');
+    const mode = document.querySelector('input[name="ranking-tipo"]:checked').value;
 
     if (!eleicaoSelect.value) {
         alert('Por favor, selecione uma eleição.');
@@ -67,18 +121,23 @@ async function carregarRanking() {
     loading.style.display = 'block';
 
     try {
-        // Buscamos 35 para ter margem de exclusão (buffer)
-        let url = `/api/ranking/top-candidatos?eleicao_id=${eleicaoSelect.value}&limit=35`;
+        let url;
+        if (mode === 'regional') {
+            const regionalSelect = document.getElementById('ranking-select-regional');
+            let regionalId = regionalSelect.value;
+            url = `/api/ranking/top-candidatos-regional?eleicao_id=${eleicaoSelect.value}&limit=35`;
+            if (regionalId) {
+                url += `&regional_id=${regionalId}`;
+            }
+        } else {
+            url = `/api/ranking/top-candidatos?eleicao_id=${eleicaoSelect.value}&limit=35`;
+        }
 
         const response = await fetch(url);
         const json = await response.json();
 
         if (json.success) {
             rankingData = json.data;
-            // Limpar lista de excluídos ao carregar nova busca? 
-            // O usuário pediu global, mas talvez queira manter durante a sessão. 
-            // Vamos manter o Set global excludedCandidates sem limpar aqui.
-
             aplicarFiltoseRenderizar();
 
         } else {
@@ -94,16 +153,23 @@ async function carregarRanking() {
 }
 
 function aplicarFiltoseRenderizar() {
-    const municipioInput = document.getElementById('ranking-busca-municipio');
-    rankingFilteredData = rankingData; // Inicialmente tudo
+    const mode = document.querySelector('input[name="ranking-tipo"]:checked').value;
+    rankingFilteredData = rankingData;
 
-    // Filtro de texto do município se houver
-    if (municipioInput && municipioInput.value.trim()) {
-        const termo = municipioInput.value.trim().toLowerCase();
-        rankingFilteredData = rankingData.filter(m => m.nome.toLowerCase().includes(termo));
+    if (mode === 'municipio') {
+        const municipioInput = document.getElementById('ranking-busca-municipio');
+        // Filtro de texto do município se houver
+        if (municipioInput && municipioInput.value.trim()) {
+            const termo = municipioInput.value.trim().toLowerCase();
+            rankingFilteredData = rankingData.filter(m => m.nome.toLowerCase().includes(termo));
+        }
+    } else {
+        // Modo regional: o filtro já foi feito no backend ou selectionamos 'Todas'
+        // Se quisermos filtrar o dropdown client-side seria aqui, mas o dropdown define a busca principal.
+        // Então não precisamos filtrar texto aqui, a menos que adicionemos input de texto.
     }
 
-    // Ordenar municípios alfabeticamente
+    // Ordenar alfabeticamente
     rankingFilteredData.sort((a, b) => a.nome.localeCompare(b.nome));
 
     renderizarRanking();

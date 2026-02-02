@@ -764,11 +764,28 @@
                             <option value="">Selecione uma eleição</option>
                         </select>
                     </div>
+
+                    <div class="control-group">
+                        <label>Visualizar por</label>
+                        <div class="toggle-group" style="display: flex; gap: 10px; align-items: center; height: 38px;">
+                            <label style="margin: 0; cursor: pointer;"><input type="radio" name="ranking-tipo"
+                                    value="municipio" checked> Município</label>
+                            <label style="margin: 0; cursor: pointer;"><input type="radio" name="ranking-tipo"
+                                    value="regional"> Regional</label>
+                        </div>
+                    </div>
+
                     <div class="control-group" style="flex-grow: 1;">
-                        <label for="ranking-busca-municipio">Filtrar Município</label>
+                        <label id="ranking-filtro-label" for="ranking-busca-municipio">Filtrar Município</label>
                         <div class="search-container">
                             <input type="text" id="ranking-busca-municipio"
                                 placeholder="Digite para filtrar municípios na lista...">
+
+                            <select id="ranking-select-regional"
+                                style="display: none; flex-grow: 1; margin-right: 10px; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                                <option value="">Todas as Regionais</option>
+                            </select>
+
                             <button class="btn btn-primary" id="btn-buscar-ranking">
                                 <i class="fas fa-search"></i> Carregar Ranking
                             </button>
