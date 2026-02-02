@@ -5,6 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "start-large": "node --max-old-space-size=8192 server.js",
     "dev": "nodemon server.js",
     "dev-large": "node --max-old-space-size=8192 server.js",
     "init-db": "node scripts/init-database.js",
