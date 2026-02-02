@@ -3602,14 +3602,154 @@ font-weight: 500;
 
 .ranking-controls {
     display: flex;
+    flex-direction: column;
     gap: 1.5rem;
     background: white;
-    padding: 1.5rem;
+    padding: 2rem;
     border-radius: 12px;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
     margin-bottom: 2rem;
-    flex-wrap: wrap;
+}
+
+.controls-row {
+    display: flex;
+    gap: 2rem;
     align-items: flex-end;
+}
+
+.row-1 {
+    border-bottom: 1px solid #f0f0f0;
+    padding-bottom: 1.5rem;
+}
+
+.control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.control-group label {
+    font-weight: 600;
+    color: #444;
+    font-size: 0.95rem;
+}
+
+/* Election Select Group */
+.election-group {
+    flex: 1;
+    max-width: 400px;
+}
+
+/* Mode Toggle Group */
+.mode-group {
+    flex: 0 0 auto;
+}
+
+.toggle-group {
+    display: flex;
+    gap: 1.5rem;
+    align-items: center;
+    background: #f8f9fa;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    border: 1px solid #e0e0e0;
+    height: 38px;
+}
+
+.toggle-group label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.toggle-group input[type="radio"] {
+    cursor: pointer;
+}
+
+/* Row 2: Filter and Actions */
+.row-2 {
+    align-items: flex-end;
+}
+
+.filter-group {
+    flex: 1;
+}
+
+.form-input,
+.form-select {
+    padding: 0.6rem 1rem;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 1rem;
+    transition: all 0.2s;
+}
+
+.form-input:focus,
+.form-select:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    outline: none;
+}
+
+.full-width {
+    width: 100%;
+}
+
+/* Expanded Multi-Select */
+.multi-select-wrapper {
+    min-width: 100%;
+    /* Take full available width in filter group */
+    user-select: none;
+    position: relative;
+    z-index: 1001;
+    /* Higher than actions */
+}
+
+/* Actions Group */
+.actions-group {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.btn-search {
+    padding: 0.6rem 1.5rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    height: 38px;
+}
+
+.utility-buttons {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btn-icon {
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+}
+
+@media (max-width: 992px) {
+    .controls-row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 1rem;
+    }
+
+    .actions-group {
+        justify-content: space-between;
+        margin-top: 0.5rem;
+    }
 }
 
 .ranking-results-grid {
@@ -3870,4 +4010,92 @@ font-weight: 500;
         page-break-inside: avoid !important;
         margin-bottom: 1cm !important;
     }
+}
+
+/* Multi-Select Styles */
+.multi-select-wrapper {
+    position: relative;
+    user-select: none;
+    min-width: 200px;
+}
+
+.select-box {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: white;
+    cursor: pointer;
+    min-height: 38px;
+}
+
+.select-box:hover {
+    border-color: #667eea;
+}
+
+.options-container {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 1000;
+    display: none;
+    padding: 0.5rem;
+}
+
+.options-container.active {
+    display: block;
+}
+
+.checkbox-item {
+    display: flex;
+    align-items: center;
+    padding: 0.4rem;
+    cursor: pointer;
+    border-radius: 4px;
+    margin-bottom: 2px;
+}
+
+.checkbox-item:hover {
+    background-color: #f5f7fa;
+}
+
+.checkbox-item input[type="checkbox"] {
+    margin-right: 10px;
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.checkbox-item label {
+    cursor: pointer;
+    flex: 1;
+    font-size: 0.9rem;
+    color: #333;
+}
+
+/* Scrollbar styling for options */
+.options-container::-webkit-scrollbar {
+    width: 6px;
+}
+
+.options-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+.options-container::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 3px;
+}
+
+.options-container::-webkit-scrollbar-thumb:hover {
+    background: #aaa;
 }

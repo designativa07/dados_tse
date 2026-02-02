@@ -28,10 +28,19 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+
     // Toggle Ranking Mode
     const radioButtons = document.querySelectorAll('input[name="ranking-tipo"]');
     radioButtons.forEach(radio => {
         radio.addEventListener('change', toggleRankingMode);
+    });
+
+    // Close multi-select when clicking outside
+    document.addEventListener('click', (e) => {
+        const wrapper = document.getElementById('ranking-regional-wrapper');
+        if (wrapper && !wrapper.contains(e.target)) {
+            document.getElementById('regional-options').classList.remove('active');
+        }
     });
 
     // Populate Regionals on load
@@ -43,16 +52,30 @@ async function carregarListaRegionais() {
         const response = await fetch('/api/regionais/regionais-psdb');
         const json = await response.json();
         if (json.success) {
-            const select = document.getElementById('ranking-select-regional');
-            if (select) {
-                // Keep the first option (Todas)
-                select.innerHTML = '<option value="">Todas as Regionais</option>';
+            const container = document.getElementById('regional-options');
+            if (container) {
+                container.innerHTML = '';
+
+                // Add "Select All" option
+                const selectAllDiv = document.createElement('div');
+                selectAllDiv.className = 'checkbox-item';
+                selectAllDiv.innerHTML = `
+                    <input type="checkbox" id="regional-all" checked onchange="toggleAllRegionais(this)">
+                    <label for="regional-all"><strong>Todas as Regionais</strong></label>
+                `;
+                container.appendChild(selectAllDiv);
+
                 json.data.forEach(reg => {
-                    const option = document.createElement('option');
-                    option.value = reg.id;
-                    option.textContent = reg.nome;
-                    select.appendChild(option);
+                    const div = document.createElement('div');
+                    div.className = 'checkbox-item';
+                    div.innerHTML = `
+                        <input type="checkbox" name="regional-checkbox" value="${reg.id}" id="reg-${reg.id}" checked onchange="updateRegionalSelectedText()">
+                        <label for="reg-${reg.id}">${reg.nome}</label>
+                    `;
+                    container.appendChild(div);
                 });
+
+                updateRegionalSelectedText();
             }
         }
     } catch (e) {
@@ -60,19 +83,47 @@ async function carregarListaRegionais() {
     }
 }
 
+function toggleRegionalDropdown() {
+    document.getElementById('regional-options').classList.toggle('active');
+}
+
+function toggleAllRegionais(source) {
+    const checkboxes = document.querySelectorAll('input[name="regional-checkbox"]');
+    checkboxes.forEach(cb => cb.checked = source.checked);
+    updateRegionalSelectedText();
+}
+
+function updateRegionalSelectedText() {
+    const checkboxes = document.querySelectorAll('input[name="regional-checkbox"]');
+    const checked = document.querySelectorAll('input[name="regional-checkbox"]:checked');
+    const textSpan = document.getElementById('regional-selected-text');
+    const selectAllCb = document.getElementById('regional-all');
+
+    if (checked.length === checkboxes.length) {
+        textSpan.textContent = "Todas as Regionais";
+        if (selectAllCb) selectAllCb.checked = true;
+    } else if (checked.length === 0) {
+        textSpan.textContent = "Nenhuma Selecionada";
+        if (selectAllCb) selectAllCb.checked = false;
+    } else {
+        textSpan.textContent = `${checked.length} Selecionadas`;
+        if (selectAllCb) selectAllCb.checked = false;
+    }
+}
+
 function toggleRankingMode() {
     const mode = document.querySelector('input[name="ranking-tipo"]:checked').value;
     const municipioInput = document.getElementById('ranking-busca-municipio');
-    const regionalSelect = document.getElementById('ranking-select-regional');
+    const regionalWrapper = document.getElementById('ranking-regional-wrapper');
     const label = document.getElementById('ranking-filtro-label');
 
     if (mode === 'regional') {
         municipioInput.style.display = 'none';
-        regionalSelect.style.display = 'block';
+        regionalWrapper.style.display = 'block';
         label.textContent = 'Filtrar Regional';
     } else {
         municipioInput.style.display = 'block';
-        regionalSelect.style.display = 'none';
+        regionalWrapper.style.display = 'none';
         label.textContent = 'Filtrar Município';
     }
 
@@ -123,12 +174,30 @@ async function carregarRanking() {
     try {
         let url;
         if (mode === 'regional') {
-            const regionalSelect = document.getElementById('ranking-select-regional');
-            let regionalId = regionalSelect.value;
-            url = `/api/ranking/top-candidatos-regional?eleicao_id=${eleicaoSelect.value}&limit=35`;
-            if (regionalId) {
-                url += `&regional_id=${regionalId}`;
+            // Collect checked IDs
+            const checked = Array.from(document.querySelectorAll('input[name="regional-checkbox"]:checked')).map(cb => cb.value);
+
+            // If none checked, show warning or fetch none?
+            if (checked.length === 0) {
+                loading.style.display = 'none';
+                container.innerHTML = '<div class="alert alert-warning">Selecione pelo menos uma regional.</div>';
+                return;
             }
+
+            // If "All" are checked, we can optionally just omit the regional_id param to fetch all (if backend supports it)
+            // Or pass all IDs. Passing IDs is safer if "All" logic is client side.
+            // Our backend logic: if regional_id param exists, it filters by it. If missing, it fetches all? 
+            // Let's check backend... "if (regional_id) { ... }" -> So if we don't pass it, it fetches all rows where cargo IN ...
+            // That works. BUT, if we have "All" checked, we might want to pass nothing to handle "all".
+            const totalCheckboxes = document.querySelectorAll('input[name="regional-checkbox"]').length;
+
+            url = `/api/ranking/top-candidatos-regional?eleicao_id=${eleicaoSelect.value}&limit=35`;
+
+            if (checked.length < totalCheckboxes) {
+                url += `&regional_id=${checked.join(',')}`;
+            }
+            // If length == totalCheckboxes, we don't append regional_id, so backend fetches all.
+
         } else {
             url = `/api/ranking/top-candidatos?eleicao_id=${eleicaoSelect.value}&limit=35`;
         }

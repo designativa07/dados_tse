@@ -165,9 +165,12 @@ router.get('/top-candidatos-regional', async (req, res) => {
         }
 
         if (regional_id) {
-            paramCount++;
-            baseQuery += ` AND r.id = $${paramCount}`;
-            params.push(regional_id);
+            const ids = regional_id.toString().split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id));
+            if (ids.length > 0) {
+                paramCount++;
+                baseQuery += ` AND r.id = ANY($${paramCount})`;
+                params.push(ids);
+            }
         }
 
         baseQuery += `
