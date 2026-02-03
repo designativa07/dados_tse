@@ -973,6 +973,32 @@
                 </div>
             </div>
 
+            <!-- Seção de Rankings de Cidades - Fora do grid para ocupar toda a largura -->
+            <div class="perfil-card rankings-cidades-full-width"
+                style="margin-top: 30px; width: 100%; max-width: none;">
+                <h3>🏆 Rankings por Município (Top 20)</h3>
+                <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 300px;">
+                        <h4
+                            style="margin-bottom: 15px; color: #2c3e50; border-bottom: 2px solid #f39c12; padding-bottom: 5px;">
+                            <i class="fas fa-vote-yea" style="color: #f39c12;"></i> Maior Votação Absoluta
+                        </h4>
+                        <div id="ranking-votos-absolutos">
+                            <div class="loading-demografico"><i class="fas fa-spinner fa-spin"></i> Carregando...</div>
+                        </div>
+                    </div>
+                    <div style="flex: 1; min-width: 300px;">
+                        <h4
+                            style="margin-bottom: 15px; color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 5px;">
+                            <i class="fas fa-percentage" style="color: #3498db;"></i> Maior % do Eleitorado
+                        </h4>
+                        <div id="ranking-votos-proporcional">
+                            <div class="loading-demografico"><i class="fas fa-spinner fa-spin"></i> Carregando...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Seção de Perfil Demográfico dos Eleitores - Correlação com Votos -->
             <div class="perfil-card perfil-demografico-full-width" id="perfil-demografico-votos">
                 <h3>📊 Perfil Demográfico dos Eleitores que Votaram neste Candidato</h3>
@@ -1479,6 +1505,7 @@
                 preencherRedesSociais(candidato);
                 preencherMapaCalor(candidato);
                 preencherVotosMesorregiao(candidato);
+                preencherRankings(candidato);
             }
 
             function exibirFotoCandidato(candidato) {
@@ -2488,6 +2515,73 @@
                         });
                     });
                 }, 100);
+            }
+
+            function preencherRankings(candidato) {
+                const containerVotos = document.getElementById('ranking-votos-absolutos');
+                const containerProp = document.getElementById('ranking-votos-proporcional');
+
+                fetch(`/api/candidatos/${candidato.id}/rankings`)
+                    .then(response => response.json())
+                    .then(data => {
+                        exibirTabelaRanking(containerVotos, data.topVotos, 'votos');
+                        exibirTabelaRanking(containerProp, data.topProporcional, 'percentual');
+                    })
+                    .catch(error => {
+                        console.error('Erro ao carregar rankings:', error);
+                        const erroHtml = '<div class="error">Erro ao carregar dados.</div>';
+                        containerVotos.innerHTML = erroHtml;
+                        containerProp.innerHTML = erroHtml;
+                    });
+            }
+
+            function exibirTabelaRanking(container, dados, tipo) {
+                if (!dados || dados.length === 0) {
+                    container.innerHTML = '<div class="no-data">Sem dados disponíveis.</div>';
+                    return;
+                }
+
+                let html = `
+                    <table class="municipios-table" style="width: 100%;">
+                        <thead>
+                            <tr>
+                                <th style="width: 50px;">#</th>
+                                <th>Município</th>
+                                <th style="text-align: right;">${tipo === 'votos' ? 'Votos' : '% Eleitores'}</th>
+                                ${tipo === 'percentual' ? '<th style="text-align: right;">Votos / Eleitores</th>' : ''}
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+
+                dados.forEach((item, index) => {
+                    const valorPrincipal = tipo === 'votos'
+                        ? parseInt(item.total_votos).toLocaleString('pt-BR')
+                        : parseFloat(item.percentual).toFixed(2) + '%';
+
+                    const detalhe = tipo === 'percentual'
+                        ? `<td style="text-align: right; font-size: 0.85em; color: #7f8c8d;">
+                            ${parseInt(item.total_votos).toLocaleString('pt-BR')} / ${parseInt(item.total_eleitores).toLocaleString('pt-BR')}
+                           </td>`
+                        : '';
+
+                    const rowClass = index < 3 ? 'top-municipio' : '';
+                    const trofeu = index < 3 ? '<i class="fas fa-trophy" style="color: #f39c12; margin-left: 5px;"></i>' : '';
+
+                    html += `
+                        <tr class="${rowClass}">
+                            <td><span class="posicao-municipio">${index + 1}º</span></td>
+                            <td><span class="municipio-nome">${item.nome} ${trofeu}</span></td>
+                            <td style="text-align: right;">
+                                <span class="${tipo === 'votos' ? 'municipio-votos' : 'municipio-percentual-total'}">${valorPrincipal}</span>
+                            </td>
+                            ${detalhe}
+                        </tr>
+                    `;
+                });
+
+                html += '</tbody></table>';
+                container.innerHTML = html;
             }
 
             // Função para carregar correlação demográfica
