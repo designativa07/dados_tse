@@ -5,6 +5,10 @@ let rankingData = [];
 let rankingFilteredData = [];
 // Conjunto para armazenar IDs dos candidatos excluídos
 let excludedCandidates = new Set();
+// Conjunto para armazenar IDs dos candidatos selecionados para visualização (filtro positivo)
+let selectedCandidates = new Set();
+let allCandidatesList = []; // Cache dos candidatos carregados
+
 
 document.addEventListener('DOMContentLoaded', () => {
     console.log('Ranking.js: DOMContentLoaded');
@@ -37,9 +41,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Close multi-select when clicking outside
     document.addEventListener('click', (e) => {
-        const wrapper = document.getElementById('ranking-regional-wrapper');
-        if (wrapper && !wrapper.contains(e.target)) {
+        const regionalWrapper = document.getElementById('ranking-regional-wrapper');
+        const candidateWrapper = document.getElementById('ranking-candidatos-group');
+        const columnWrapper = document.getElementById('column-options'); // Wrapper handled differently usually
+
+        if (regionalWrapper && !regionalWrapper.contains(e.target)) {
             document.getElementById('regional-options').classList.remove('active');
+        }
+        if (candidateWrapper && !candidateWrapper.contains(e.target)) {
+            document.getElementById('candidate-options').classList.remove('active');
+        }
+
+        const colBox = document.querySelector('.control-group label:contains("Colunas")')?.parentElement;
+        // Simpler check for column dropdown
+        const colOptions = document.getElementById('column-options');
+        const colSelectBox = colOptions?.parentElement?.querySelector('.select-box');
+
+        if (colOptions && colOptions.classList.contains('active')) {
+            if (!colOptions.contains(e.target) && !colSelectBox.contains(e.target)) {
+                colOptions.classList.remove('active');
+            }
         }
     });
 
@@ -132,6 +153,10 @@ function toggleRankingMode() {
     container.innerHTML = '<div class="placeholder-msg"><p>Clique em Carregar Ranking para atualizar.</p></div>';
     rankingData = [];
     rankingFilteredData = [];
+
+    // Hide candidate filter until data is loaded
+    const candGroup = document.getElementById('ranking-candidatos-group');
+    if (candGroup) candGroup.style.display = 'none';
 }
 
 function toggleLayout() {
@@ -191,15 +216,19 @@ async function carregarRanking() {
             // That works. BUT, if we have "All" checked, we might want to pass nothing to handle "all".
             const totalCheckboxes = document.querySelectorAll('input[name="regional-checkbox"]').length;
 
-            url = `/api/ranking/top-candidatos-regional?eleicao_id=${eleicaoSelect.value}&limit=35`;
+            const limitEl = document.getElementById('ranking-limite');
+            const limit = limitEl ? limitEl.value : 50;
+
+            url = `/api/ranking/top-candidatos-regional?eleicao_id=${eleicaoSelect.value}&limit=${limit}`;
 
             if (checked.length < totalCheckboxes) {
                 url += `&regional_id=${checked.join(',')}`;
             }
             // If length == totalCheckboxes, we don't append regional_id, so backend fetches all.
-
         } else {
-            url = `/api/ranking/top-candidatos?eleicao_id=${eleicaoSelect.value}&limit=35`;
+            const limitEl = document.getElementById('ranking-limite');
+            const limit = limitEl ? limitEl.value : 50;
+            url = `/api/ranking/top-candidatos?eleicao_id=${eleicaoSelect.value}&limit=${limit}`;
         }
 
         const response = await fetch(url);
@@ -207,6 +236,8 @@ async function carregarRanking() {
 
         if (json.success) {
             rankingData = json.data;
+            document.getElementById('ranking-candidatos-group').style.display = 'block';
+            populateCandidateFilter();
             aplicarFiltoseRenderizar();
 
         } else {
@@ -265,11 +296,18 @@ function renderizarRanking() {
         `;
 
         // Filtrar candidatos excluídos e pegar top 20
+        // Filtrar candidatos excluídos e pegar top 20
         const topFederal = filtrarEProcessarCandidatos(municipio.cargos['DEPUTADO FEDERAL']);
         const topEstadual = filtrarEProcessarCandidatos(municipio.cargos['DEPUTADO ESTADUAL']);
 
-        html += renderizarTabelaCargo('Deputado Federal', topFederal);
-        html += renderizarTabelaCargo('Deputado Estadual', topEstadual);
+        const cargoFiltro = document.getElementById('ranking-cargo-filtro')?.value;
+
+        if (!cargoFiltro || cargoFiltro === 'DEPUTADO FEDERAL') {
+            html += renderizarTabelaCargo('Deputado Federal', topFederal);
+        }
+        if (!cargoFiltro || cargoFiltro === 'DEPUTADO ESTADUAL') {
+            html += renderizarTabelaCargo('Deputado Estadual', topEstadual);
+        }
 
         html += `</div>`;
         card.innerHTML = html;
@@ -279,10 +317,24 @@ function renderizarRanking() {
 
 function filtrarEProcessarCandidatos(candidatos) {
     if (!candidatos) return [];
-    // 1. Filtrar excluídos
-    const filtrados = candidatos.filter(c => !excludedCandidates.has(c.id));
-    // 2. Pegar top 20
-    return filtrados.slice(0, 20);
+
+    // 1. Filtrar excluídos (exclusão explicita)
+    let filtrados = candidatos.filter(c => !excludedCandidates.has(c.id));
+
+    // 2. Filtrar Selecionados (inclusão explicita)
+    // Se houver algum candidato selecionado na lista, mostramos APENAS eles.
+    // Se a lista estiver vazia (padrão), mostramos todos.
+    if (selectedCandidates.size > 0) {
+        filtrados = filtrados.filter(c => selectedCandidates.has(c.id));
+    }
+
+    // 2. Pegar top 20 (ou N conforme config) - Aplicamos o slice APÓS os filtros de seleção?
+    // Se o usuário selecionou candidatos específicos, ele quer ver esses candidatos, mesmo que não sejam top 20.
+    // Mas a gente só tem os dados que vieram do backend (que já limitou a Top N).
+    // Então só conseguimos mostrar o que temos.
+    // Se o filtro reduziu a lista, mostramos o que sobrou.
+
+    return filtrados.slice(0, 50); // Aumentei o slice visual para caso o usuario selecione muitos
 }
 
 function renderizarTabelaCargo(titulo, candidatos) {
@@ -295,14 +347,39 @@ function renderizarTabelaCargo(titulo, candidatos) {
         `;
     }
 
-    let rows = candidatos.map((c, index) => `
+    // Determinar quais colunas exibir
+    const showPos = document.getElementById('col-pos').checked;
+    const showCand = document.getElementById('col-cand').checked;
+    const showPartido = document.getElementById('col-partido').checked;
+    const showVotos = document.getElementById('col-votos').checked;
+    const showFoto = document.getElementById('col-foto').checked;
+
+    let headers = '';
+    if (showPos) headers += `<th style="width: 50px;">Pos</th>`;
+    if (showFoto) headers += `<th style="width: 50px;">Foto</th>`;
+    if (showCand) headers += `<th>Candidato</th>`;
+    if (showPartido) headers += `<th>Partido</th>`;
+    if (showVotos) headers += `<th style="text-align: right;">Votos</th>`;
+    headers += `<th style="width: 80px;"></th>`; // Actions always visible
+
+    let rows = candidatos.map((c, index) => {
+        let cells = '';
+        if (showPos) cells += `<td class="rank-col">#${c.rank || index + 1}</td>`;
+        if (showFoto) {
+            // Check if foto is valid string and likely a filename
+            const hasFoto = c.foto && typeof c.foto === 'string' && c.foto.length > 3 && c.foto !== 'null' && c.foto !== 'undefined';
+            const fotoUrl = hasFoto ? `/fotos_candidatos/${c.foto}` : 'assets/img/sem-foto.png';
+
+            // Add loading=lazy and robust onerror
+            cells += `<td><img src="${fotoUrl}" loading="lazy" style="width:30px;height:30px;border-radius:4px;object-fit:cover;" onerror="this.onerror=null;this.src='assets/img/sem-foto.png'"></td>`;
+        }
+        if (showCand) cells += `<td class="nome-col"><strong>${c.nome_urna || c.nome}</strong></td>`;
+        if (showPartido) cells += `<td class="partido-col">${c.partido}</td>`;
+        if (showVotos) cells += `<td class="votos-col">${c.votos.toLocaleString('pt-BR')} votos</td>`;
+
+        return `
         <tr>
-            <td class="rank-col">#${index + 1}</td>
-            <td class="nome-col">
-                <strong>${c.nome_urna || c.nome}</strong>
-            </td>
-            <td class="partido-col">${c.partido}</td>
-            <td class="votos-col">${c.votos.toLocaleString('pt-BR')} votos</td>
+            ${cells}
             <td class="action-col">
                 <button onclick="excluirCandidato(${c.id})" class="btn-excluir-sm" title="Excluir Candidato">
                     <i class="fas fa-trash-alt"></i>
@@ -312,7 +389,7 @@ function renderizarTabelaCargo(titulo, candidatos) {
                 </a>
             </td>
         </tr>
-    `).join('');
+    `}).join('');
 
     return `
         <div class="cargo-block">
@@ -320,11 +397,7 @@ function renderizarTabelaCargo(titulo, candidatos) {
             <table class="ranking-table">
                 <thead>
                     <tr>
-                        <th style="width: 50px;">Pos</th>
-                        <th>Candidato</th>
-                        <th>Partido</th>
-                        <th style="text-align: right;">Votos</th>
-                        <th style="width: 80px;"></th>
+                        ${headers}
                     </tr>
                 </thead>
                 <tbody>
@@ -355,47 +428,51 @@ function exportarRankingExcel() {
     const dadosExcel = [];
 
     // Título das colunas
-    dadosExcel.push(['Município', 'Cargo', 'Posição', 'Candidato', 'Partido', 'Votos']);
+    const headers = ['Município', 'Cargo'];
+    const showPos = document.getElementById('col-pos').checked;
+    const showCand = document.getElementById('col-cand').checked;
+    const showPartido = document.getElementById('col-partido').checked;
+    const showVotos = document.getElementById('col-votos').checked;
+
+    if (showPos) headers.push('Posição');
+    if (showCand) headers.push('Candidato');
+    if (showPartido) headers.push('Partido');
+    if (showVotos) headers.push('Votos');
+
+    dadosExcel.push(headers);
+
+    const cargoFiltro = document.getElementById('ranking-cargo-filtro')?.value;
 
     rankingFilteredData.forEach(municipio => {
-        // Deputado Federal
-        const federais = filtrarEProcessarCandidatos(municipio.cargos['DEPUTADO FEDERAL']);
-        federais.forEach((c, index) => {
-            dadosExcel.push([
-                municipio.nome,
-                'Deputado Federal',
-                index + 1,
-                c.nome_urna || c.nome,
-                c.partido,
-                c.votos
-            ]);
-        });
+        // Função auxiliar para adicionar linha
+        const addRow = (c, cargo, index) => {
+            const row = [municipio.nome, cargo];
+            if (showPos) row.push(c.rank || index + 1);
+            if (showCand) row.push(c.nome_urna || c.nome);
+            if (showPartido) row.push(c.partido);
+            if (showVotos) row.push(c.votos);
+            dadosExcel.push(row);
+        };
 
+        // Deputado Federal
+        if (!cargoFiltro || cargoFiltro === 'DEPUTADO FEDERAL') {
+            filtrarEProcessarCandidatos(municipio.cargos['DEPUTADO FEDERAL']).forEach((c, i) => addRow(c, 'Deputado Federal', i));
+        }
         // Deputado Estadual
-        const estaduais = filtrarEProcessarCandidatos(municipio.cargos['DEPUTADO ESTADUAL']);
-        estaduais.forEach((c, index) => {
-            dadosExcel.push([
-                municipio.nome,
-                'Deputado Estadual',
-                index + 1,
-                c.nome_urna || c.nome,
-                c.partido,
-                c.votos
-            ]);
-        });
+        if (!cargoFiltro || cargoFiltro === 'DEPUTADO ESTADUAL') {
+            filtrarEProcessarCandidatos(municipio.cargos['DEPUTADO ESTADUAL']).forEach((c, i) => addRow(c, 'Deputado Estadual', i));
+        }
     });
 
     const ws = XLSX.utils.aoa_to_sheet(dadosExcel);
 
-    // Ajuste de largura das colunas
-    const wscols = [
-        { wch: 30 }, // Município
-        { wch: 20 }, // Cargo
-        { wch: 10 }, // Posição
-        { wch: 40 }, // Candidato
-        { wch: 15 }, // Partido
-        { wch: 15 }  // Votos
-    ];
+    // Ajuste de largura das colunas (aproximado)
+    const wscols = [{ wch: 30 }, { wch: 20 }];
+    if (showPos) wscols.push({ wch: 10 });
+    if (showCand) wscols.push({ wch: 40 });
+    if (showPartido) wscols.push({ wch: 15 });
+    if (showVotos) wscols.push({ wch: 15 });
+
     ws['!cols'] = wscols;
 
     XLSX.utils.book_append_sheet(wb, ws, "Ranking Eleitoral");
@@ -404,6 +481,116 @@ function exportarRankingExcel() {
     const dataHora = new Date().toISOString().slice(0, 19).replace(/[-:]/g, "").replace("T", "_");
     XLSX.writeFile(wb, `Ranking_Eleitoral_${dataHora}.xlsx`);
 }
+
+// ============== NOVAS FUNCIONALIDADES DE FILTRO E COLUNAS ==============
+
+function toggleColumnDropdown() {
+    const el = document.getElementById('column-options');
+    if (el) el.classList.toggle('active');
+}
+
+function updateColumnDisplay() {
+    renderizarRanking();
+}
+
+function toggleCandidateDropdown() {
+    document.getElementById('candidate-options').classList.toggle('active');
+}
+
+function populateCandidateFilter() {
+    // Reset selections on new data
+    selectedCandidates.clear();
+
+    // 1. Coletar todos os candidatos únicos dos dados atuais
+    const uniqueCandidates = new Map();
+
+    rankingData.forEach(m => {
+        ['DEPUTADO FEDERAL', 'DEPUTADO ESTADUAL'].forEach(cargo => {
+            if (m.cargos && m.cargos[cargo]) {
+                m.cargos[cargo].forEach(c => {
+                    if (!uniqueCandidates.has(c.id)) {
+                        uniqueCandidates.set(c.id, {
+                            id: c.id,
+                            nome: c.nome_urna || c.nome,
+                            partido: c.partido,
+                            cargo: cargo
+                        });
+                    }
+                });
+            }
+        });
+    });
+
+    allCandidatesList = Array.from(uniqueCandidates.values());
+    // Ordenar por nome
+    allCandidatesList.sort((a, b) => a.nome.localeCompare(b.nome));
+
+    renderCandidateOptions(allCandidatesList);
+}
+
+function renderCandidateOptions(lista) {
+    const container = document.getElementById('candidate-checkboxes');
+    container.innerHTML = '';
+
+    // Opção "Selecionar Todos / Nenhum"
+    // Na verdade, se nenhum selecionado = todos.
+    // Vamos adicionar um botão "Limpar Seleção" se houver selecionados?
+    // Ou apenas iterar a lista.
+
+    lista.forEach(c => {
+        const div = document.createElement('div');
+        div.className = 'checkbox-item';
+        // Se já estava selecionado antes, manter checked
+        const isChecked = selectedCandidates.has(c.id) ? 'checked' : '';
+
+        div.innerHTML = `
+            <input type="checkbox" id="cand-filter-${c.id}" value="${c.id}" ${isChecked} onchange="updateCandidateFilter(this)">
+            <label for="cand-filter-${c.id}">
+                <span class="cand-name">${c.nome}</span>
+                <span class="cand-info">(${c.partido} - ${c.cargo === 'DEPUTADO ESTADUAL' ? 'Est.' : 'Fed.'})</span>
+            </label>
+        `;
+        container.appendChild(div);
+    });
+
+    updateCandidateSelectedText();
+}
+
+function filterCandidateOptions() {
+    const term = document.getElementById('candidate-search-input').value.toLowerCase();
+    const filtered = allCandidatesList.filter(c =>
+        c.nome.toLowerCase().includes(term) ||
+        c.partido.toLowerCase().includes(term)
+    );
+    renderCandidateOptions(filtered);
+}
+
+function updateCandidateFilter(checkbox) {
+    const id = parseInt(checkbox.value);
+    if (checkbox.checked) {
+        selectedCandidates.add(id);
+    } else {
+        selectedCandidates.delete(id);
+    }
+    updateCandidateSelectedText();
+    aplicarFiltoseRenderizar();
+}
+
+function updateCandidateSelectedText() {
+    const textSpan = document.getElementById('candidate-selected-text');
+    if (selectedCandidates.size === 0) {
+        textSpan.textContent = "Todos os Candidatos";
+    } else {
+        textSpan.textContent = `${selectedCandidates.size} Selecionado(s)`;
+    }
+}
+// GLOBAL EXPORTS
+window.toggleColumnDropdown = toggleColumnDropdown;
+window.updateColumnDisplay = updateColumnDisplay;
+window.toggleCandidateDropdown = toggleCandidateDropdown;
+window.filterCandidateOptions = filterCandidateOptions;
+window.updateCandidateFilter = updateCandidateFilter;
+
 
 // Exportar para ser acessível globalmente
 window.carregarRanking = carregarRanking;

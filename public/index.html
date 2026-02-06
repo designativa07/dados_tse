@@ -888,6 +888,89 @@
                             </div>
                         </div>
 
+                        <!-- Novo: Filtro de Candidatos -->
+                        <div class="control-group filter-group" id="ranking-candidatos-group" style="display: none;">
+                            <label>Filtrar Candidatos</label>
+                            <div class="multi-select-wrapper">
+                                <div class="select-box" onclick="toggleCandidateDropdown()">
+                                    <span id="candidate-selected-text">Todos os Candidatos</span>
+                                    <i class="fas fa-chevron-down"></i>
+                                </div>
+                                <div class="options-container search-container" id="candidate-options">
+                                    <div class="params-search">
+                                        <input type="text" id="candidate-search-input" placeholder="Buscar..."
+                                            onclick="event.stopPropagation()" onkeyup="filterCandidateOptions()">
+                                    </div>
+                                    <div id="candidate-checkboxes">
+                                        <!-- Checkboxes serão inseridos via JS -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Novo: Filtro de Cargo -->
+                        <div class="control-group">
+                            <label for="ranking-cargo-filtro">Cargo</label>
+                            <select id="ranking-cargo-filtro" class="form-select" onchange="aplicarFiltoseRenderizar()">
+                                <option value="">Todos</option>
+                                <option value="DEPUTADO FEDERAL">Deputado Federal</option>
+                                <option value="DEPUTADO ESTADUAL">Deputado Estadual</option>
+                            </select>
+                        </div>
+
+                        <!-- Novo: Seletor de Colunas -->
+                        <div class="control-group filter-group">
+                            <label>Colunas</label>
+                            <div class="multi-select-wrapper">
+                                <div class="select-box" onclick="toggleColumnDropdown()">
+                                    <span id="column-selected-text">Padrão</span>
+                                    <i class="fas fa-chevron-down"></i>
+                                </div>
+                                <div class="options-container" id="column-options">
+                                    <div class="checkbox-item">
+                                        <input type="checkbox" id="col-pos" value="pos" checked
+                                            onchange="updateColumnDisplay()">
+                                        <label for="col-pos">Posição</label>
+                                    </div>
+                                    <div class="checkbox-item">
+                                        <input type="checkbox" id="col-cand" value="candidato" checked
+                                            onchange="updateColumnDisplay()">
+                                        <label for="col-cand">Candidato</label>
+                                    </div>
+                                    <div class="checkbox-item">
+                                        <input type="checkbox" id="col-partido" value="partido" checked
+                                            onchange="updateColumnDisplay()">
+                                        <label for="col-partido">Partido</label>
+                                    </div>
+                                    <div class="checkbox-item">
+                                        <input type="checkbox" id="col-votos" value="votos" checked
+                                            onchange="updateColumnDisplay()">
+                                        <label for="col-votos">Votos</label>
+                                    </div>
+                                    <div class="checkbox-item">
+                                        <input type="checkbox" id="col-foto" value="foto"
+                                            onchange="updateColumnDisplay()">
+                                        <label for="col-foto">Foto</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Novo: Limite de Resultados -->
+                        <div class="control-group">
+                            <label for="ranking-limite">Qtd.</label>
+                            <select id="ranking-limite" class="form-select" style="width: 80px;"
+                                onchange="carregarRanking()">
+                                <option value="10">10</option>
+                                <option value="20">20</option>
+                                <option value="30">30</option>
+                                <option value="50" selected>50</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="controls-row row-3"
+                        style="justify-content: flex-end; padding-top: 1rem; border-top: 1px solid #f0f0f0;">
                         <div class="actions-group">
                             <button class="btn btn-primary btn-search" id="btn-buscar-ranking">
                                 <i class="fas fa-search"></i> Carregar

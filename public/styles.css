@@ -4285,3 +4285,28 @@ body {
         grid-template-columns: 1fr;
     }
 }
+/* Candidate Search Input in Dropdown */
+.params-search {
+    padding: 0.5rem;
+    border-bottom: 1px solid #eee;
+    background: #fdfdfd;
+}
+
+.params-search input {
+    width: 100%;
+    padding: 6px 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+.cand-name {
+    font-weight: 500;
+    display: block;
+}
+
+.cand-info {
+    font-size: 0.8rem;
+    color: #666;
+    display: block;
+}
