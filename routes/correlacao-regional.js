@@ -6,8 +6,8 @@ const db = require('../config/database');
 // GET /api/correlacao-regional/potencial-crescimento
 // Cruza filiados PSDB com perfil demográfico para identificar potencial de crescimento
 router.get('/potencial-crescimento', async (req, res) => {
-    try {
-        const query = `
+  try {
+    const query = `
       WITH demografico AS (
         SELECT 
           cd_municipio,
@@ -27,14 +27,15 @@ router.get('/potencial-crescimento', async (req, res) => {
         SELECT 
           m.codigo,
           m.nome,
-          mr.regional,
-          mr.filiados_2024 as filiados,
-          mr.populacao
+          rp.nome as regional,
+          mr.filiados_psdb_2024 as filiados,
+          mr.populacao_2024 as populacao
         FROM municipios m
-        LEFT JOIN municipios_regionais mr ON m.codigo::text = mr.codigo::text
+        LEFT JOIN municipios_regionais mr ON m.nome = mr.nome
+        LEFT JOIN regionais_psdb rp ON mr.regional_psdb_id = rp.id
       )
       SELECT 
-        d.nm_municipio as municipio,
+        COALESCE(r.nome, d.nm_municipio) as municipio,
         r.regional,
         d.total_eleitores,
         COALESCE(r.filiados, 0) as filiados,
@@ -64,59 +65,62 @@ router.get('/potencial-crescimento', async (req, res) => {
       LIMIT 30
     `;
 
-        const result = await db.query(query);
+    const result = await db.query(query);
 
-        res.json({
-            success: true,
-            potencial_crescimento: result.rows
-        });
-    } catch (error) {
-        console.error('Erro ao buscar potencial de crescimento:', error);
-        res.status(500).json({ error: 'Erro interno do servidor' });
-    }
+    res.json({
+      success: true,
+      potencial_crescimento: result.rows
+    });
+  } catch (error) {
+    console.error('Erro ao buscar potencial de crescimento:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
 });
 
 // GET /api/correlacao-regional/comparativo
 // Compara regionais por indicadores demográficos
 router.get('/comparativo', async (req, res) => {
-    try {
-        const query = `
+  try {
+    const query = `
       SELECT 
-        mr.regional,
+        rp.nome as regional,
         COUNT(DISTINCT m.id) as total_municipios,
-        SUM(mr.filiados_2024) as total_filiados,
-        SUM(mr.populacao) as total_populacao,
-        ROUND(SUM(mr.filiados_2024) * 1000.0 / NULLIF(SUM(mr.populacao), 0), 2) as taxa_filiacao_por_mil
+        SUM(mr.filiados_psdb_2024) as total_filiados,
+        SUM(mr.populacao_2024) as total_populacao,
+        ROUND(SUM(mr.filiados_psdb_2024) * 1000.0 / NULLIF(SUM(mr.populacao_2024), 0), 2) as taxa_filiacao_por_mil
       FROM municipios m
-      INNER JOIN municipios_regionais mr ON m.codigo::text = mr.codigo::text
-      WHERE mr.regional IS NOT NULL
-      GROUP BY mr.regional
+      INNER JOIN municipios_regionais mr ON m.nome = mr.nome
+      INNER JOIN regionais_psdb rp ON mr.regional_psdb_id = rp.id
+      WHERE rp.nome IS NOT NULL
+      GROUP BY rp.nome
       ORDER BY total_filiados DESC
     `;
 
-        const result = await db.query(query);
+    const result = await db.query(query);
 
-        res.json({
-            success: true,
-            comparativo_regionais: result.rows
-        });
-    } catch (error) {
-        console.error('Erro ao buscar comparativo de regionais:', error);
-        res.status(500).json({ error: 'Erro interno do servidor' });
-    }
+    res.json({
+      success: true,
+      comparativo_regionais: result.rows
+    });
+  } catch (error) {
+    console.error('Erro ao buscar comparativo de regionais:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
 });
 
 // GET /api/correlacao-regional/demografico-regional/:regional
 // Perfil demográfico de uma regional PSDB
 router.get('/demografico-regional/:regional', async (req, res) => {
-    try {
-        const { regional } = req.params;
+  try {
+    const { regional } = req.params;
 
-        const query = `
+    const query = `
       WITH municipios_regional AS (
-        SELECT mr.codigo
+        SELECT m.codigo
         FROM municipios_regionais mr
-        WHERE mr.regional = $1
+        JOIN regionais_psdb rp ON mr.regional_psdb_id = rp.id
+        JOIN municipios m ON mr.nome = m.nome
+        WHERE rp.nome = $1
       )
       SELECT 
         ds_genero,
@@ -124,45 +128,45 @@ router.get('/demografico-regional/:regional', async (req, res) => {
         ds_faixa_etaria,
         SUM(qt_eleitores_perfil) as total
       FROM perfil_eleitor_secao p
-      WHERE p.cd_municipio::text IN (SELECT codigo FROM municipios_regional)
+      WHERE p.cd_municipio::text IN (SELECT codigo::text FROM municipios_regional)
         AND p.ano_eleicao = 2022
       GROUP BY ds_genero, ds_grau_escolaridade, ds_faixa_etaria
       ORDER BY total DESC
     `;
 
-        const result = await db.query(query, [regional]);
+    const result = await db.query(query, [regional]);
 
-        // Agregar por categoria
-        const porGenero = {};
-        const porEscolaridade = {};
-        const porFaixaEtaria = {};
+    // Agregar por categoria
+    const porGenero = {};
+    const porEscolaridade = {};
+    const porFaixaEtaria = {};
 
-        result.rows.forEach(row => {
-            const total = parseInt(row.total);
+    result.rows.forEach(row => {
+      const total = parseInt(row.total);
 
-            if (!porGenero[row.ds_genero]) porGenero[row.ds_genero] = 0;
-            porGenero[row.ds_genero] += total;
+      if (!porGenero[row.ds_genero]) porGenero[row.ds_genero] = 0;
+      porGenero[row.ds_genero] += total;
 
-            if (!porEscolaridade[row.ds_grau_escolaridade]) porEscolaridade[row.ds_grau_escolaridade] = 0;
-            porEscolaridade[row.ds_grau_escolaridade] += total;
+      if (!porEscolaridade[row.ds_grau_escolaridade]) porEscolaridade[row.ds_grau_escolaridade] = 0;
+      porEscolaridade[row.ds_grau_escolaridade] += total;
 
-            if (!porFaixaEtaria[row.ds_faixa_etaria]) porFaixaEtaria[row.ds_faixa_etaria] = 0;
-            porFaixaEtaria[row.ds_faixa_etaria] += total;
-        });
+      if (!porFaixaEtaria[row.ds_faixa_etaria]) porFaixaEtaria[row.ds_faixa_etaria] = 0;
+      porFaixaEtaria[row.ds_faixa_etaria] += total;
+    });
 
-        res.json({
-            success: true,
-            regional,
-            perfil: {
-                genero: Object.entries(porGenero).map(([k, v]) => ({ categoria: k, total: v })),
-                escolaridade: Object.entries(porEscolaridade).map(([k, v]) => ({ categoria: k, total: v })),
-                faixa_etaria: Object.entries(porFaixaEtaria).map(([k, v]) => ({ categoria: k, total: v }))
-            }
-        });
-    } catch (error) {
-        console.error('Erro ao buscar perfil demográfico da regional:', error);
-        res.status(500).json({ error: 'Erro interno do servidor' });
-    }
+    res.json({
+      success: true,
+      regional,
+      perfil: {
+        genero: Object.entries(porGenero).map(([k, v]) => ({ categoria: k, total: v })),
+        escolaridade: Object.entries(porEscolaridade).map(([k, v]) => ({ categoria: k, total: v })),
+        faixa_etaria: Object.entries(porFaixaEtaria).map(([k, v]) => ({ categoria: k, total: v }))
+      }
+    });
+  } catch (error) {
+    console.error('Erro ao buscar perfil demográfico da regional:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
 });
 
 module.exports = router;

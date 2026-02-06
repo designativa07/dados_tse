@@ -52,7 +52,6 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('candidate-options').classList.remove('active');
         }
 
-        const colBox = document.querySelector('.control-group label:contains("Colunas")')?.parentElement;
         // Simpler check for column dropdown
         const colOptions = document.getElementById('column-options');
         const colSelectBox = colOptions?.parentElement?.querySelector('.select-box');

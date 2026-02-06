@@ -18,11 +18,11 @@ const votoSchema = Joi.object({
 // GET /api/votos - Listar votos com filtros
 router.get('/', async (req, res) => {
   try {
-    const { 
-      page = 1, 
-      limit = 50, 
-      eleicao_id, 
-      municipio_id, 
+    const {
+      page = 1,
+      limit = 50,
+      eleicao_id,
+      municipio_id,
       candidato_id,
       min_votos,
       max_votos,
@@ -32,57 +32,57 @@ router.get('/', async (req, res) => {
       busca_candidato = '',
       busca_municipio = ''
     } = req.query;
-    
+
     const offset = (page - 1) * limit;
-    
+
     // Construir WHERE clause dinamicamente
     let whereConditions = [];
     let params = [];
     let paramCount = 0;
-    
+
     if (eleicao_id) {
       whereConditions.push(`v.eleicao_id = $${++paramCount}`);
       params.push(eleicao_id);
     }
-    
+
     if (municipio_id) {
       whereConditions.push(`v.municipio_id = $${++paramCount}`);
       params.push(municipio_id);
     }
-    
+
     if (candidato_id) {
       whereConditions.push(`v.candidato_id = $${++paramCount}`);
       params.push(candidato_id);
     }
-    
+
     if (min_votos) {
       whereConditions.push(`v.quantidade_votos >= $${++paramCount}`);
       params.push(min_votos);
     }
-    
+
     if (max_votos) {
       whereConditions.push(`v.quantidade_votos <= $${++paramCount}`);
       params.push(max_votos);
     }
-    
+
     // Adicionar filtros de busca
     if (busca_candidato) {
       whereConditions.push(`c.nome ILIKE $${++paramCount}`);
       params.push(`%${busca_candidato}%`);
     }
-    
+
     if (busca_municipio) {
       whereConditions.push(`m.nome ILIKE $${++paramCount}`);
       params.push(`%${busca_municipio}%`);
     }
-    
+
     const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
-    
+
     // Validar ordenação
     const allowedOrderFields = ['quantidade_votos', 'municipio', 'candidato', 'zona', 'secao', 'cargo'];
     const orderField = allowedOrderFields.includes(ordenar_por) ? ordenar_por : 'quantidade_votos';
     const orderDirection = ordem.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
-    
+
     // Query para contar total
     let countQuery;
     if (agrupar_por !== 'nenhum') {
@@ -123,7 +123,7 @@ router.get('/', async (req, res) => {
     }
     const countResult = await db.query(countQuery, params);
     const total = parseInt(countResult.rows[0].count);
-    
+
     // Determinar se deve agrupar os dados
     let dataQuery;
     let groupByClause = '';
@@ -137,7 +137,7 @@ router.get('/', async (req, res) => {
       e.ano as eleicao_ano,
       e.tipo as eleicao_tipo
     `;
-    
+
     if (agrupar_por !== 'nenhum') {
       // Agrupar dados
       if (agrupar_por === 'candidato') {
@@ -175,7 +175,7 @@ router.get('/', async (req, res) => {
         groupByClause = 'GROUP BY c.cargo';
       }
     }
-    
+
     dataQuery = `
       SELECT ${selectFields}
       FROM votos v
@@ -187,10 +187,10 @@ router.get('/', async (req, res) => {
       ORDER BY total_votos DESC
       LIMIT $${++paramCount} OFFSET $${++paramCount}
     `;
-    
+
     params.push(limit, offset);
     const result = await db.query(dataQuery, params);
-    
+
     res.json({
       data: result.rows,
       pagination: {
@@ -209,18 +209,18 @@ router.get('/', async (req, res) => {
 // GET /api/votos/agregados - Votos agregados por município/candidato
 router.get('/agregados', async (req, res) => {
   try {
-    const { 
-      eleicao_id, 
+    const {
+      eleicao_id,
       agrupar_por = 'municipio',
       ordenar_por = 'total_votos',
       ordem = 'DESC',
       limite = 100
     } = req.query;
-    
+
     // eleicao_id é opcional - se não fornecido, busca dados de todas as eleições
-    
+
     let groupByField, orderByField;
-    
+
     if (agrupar_por === 'municipio') {
       groupByField = 'm.id, m.nome, m.sigla_uf';
       orderByField = ordenar_por === 'municipio' ? 'm.nome' : 'total_votos';
@@ -233,20 +233,20 @@ router.get('/agregados', async (req, res) => {
     } else {
       return res.status(400).json({ error: 'agrupar_por deve ser "municipio", "candidato" ou "cargo"' });
     }
-    
+
     const orderDirection = ordem.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
-    
+
     // Construir WHERE clause baseado na presença de eleicao_id
     let whereClause = '';
     let params = [];
     let paramCount = 0;
-    
+
     if (eleicao_id) {
       whereClause = 'WHERE v.eleicao_id = $1';
       params.push(eleicao_id);
       paramCount = 1;
     }
-    
+
     const query = `
       SELECT 
         ${groupByField},
@@ -262,10 +262,10 @@ router.get('/agregados', async (req, res) => {
       ORDER BY ${orderByField} ${orderDirection}
       LIMIT $${++paramCount}
     `;
-    
+
     params.push(limite);
     const result = await db.query(query, params);
-    
+
     res.json({
       data: result.rows,
       agrupamento: agrupar_por,
@@ -281,20 +281,20 @@ router.get('/agregados', async (req, res) => {
 router.get('/mapa', async (req, res) => {
   try {
     const { eleicao_id, candidato_id } = req.query;
-    
+
     if (!eleicao_id) {
       return res.status(400).json({ error: 'eleicao_id é obrigatório' });
     }
-    
+
     let whereClause = 'WHERE v.eleicao_id = $1';
     let params = [eleicao_id];
     let paramCount = 1;
-    
+
     if (candidato_id) {
       whereClause += ` AND v.candidato_id = $${++paramCount}`;
       params.push(candidato_id);
     }
-    
+
     const query = `
       SELECT 
         m.nome as municipio,
@@ -311,9 +311,9 @@ router.get('/mapa', async (req, res) => {
       HAVING m.latitude IS NOT NULL AND m.longitude IS NOT NULL
       ORDER BY total_votos DESC
     `;
-    
+
     const result = await db.query(query, params);
-    
+
     res.json({
       data: result.rows,
       total_municipios: result.rows.length
@@ -329,20 +329,20 @@ router.post('/', async (req, res) => {
   try {
     const { error, value } = votoSchema.validate(req.body);
     if (error) {
-      return res.status(400).json({ 
-        error: 'Dados inválidos', 
-        details: error.details 
+      return res.status(400).json({
+        error: 'Dados inválidos',
+        details: error.details
       });
     }
-    
+
     const { eleicao_id, municipio_id, candidato_id, zona, secao, local_votacao, endereco_local, quantidade_votos } = value;
-    
+
     const result = await db.query(`
       INSERT INTO votos (eleicao_id, municipio_id, candidato_id, zona, secao, local_votacao, endereco_local, quantidade_votos)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING *
     `, [eleicao_id, municipio_id, candidato_id, zona, secao, local_votacao, endereco_local, quantidade_votos]);
-    
+
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('Erro ao criar voto:', error);
@@ -354,41 +354,41 @@ router.post('/', async (req, res) => {
 router.post('/batch', async (req, res) => {
   try {
     const { votos } = req.body;
-    
+
     if (!Array.isArray(votos) || votos.length === 0) {
       return res.status(400).json({ error: 'Lista de votos é obrigatória' });
     }
-    
+
     // Validar cada voto
     for (let i = 0; i < votos.length; i++) {
       const { error } = votoSchema.validate(votos[i]);
       if (error) {
-        return res.status(400).json({ 
-          error: `Voto ${i + 1} inválido`, 
-          details: error.details 
+        return res.status(400).json({
+          error: `Voto ${i + 1} inválido`,
+          details: error.details
         });
       }
     }
-    
+
     // Usar transação para inserir todos os votos
     const result = await db.transaction(async (client) => {
       const insertedVotos = [];
-      
+
       for (const voto of votos) {
         const { eleicao_id, municipio_id, candidato_id, zona, secao, local_votacao, endereco_local, quantidade_votos } = voto;
-        
+
         const votoResult = await client.query(`
           INSERT INTO votos (eleicao_id, municipio_id, candidato_id, zona, secao, local_votacao, endereco_local, quantidade_votos)
           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
           RETURNING *
         `, [eleicao_id, municipio_id, candidato_id, zona, secao, local_votacao, endereco_local, quantidade_votos]);
-        
+
         insertedVotos.push(votoResult.rows[0]);
       }
-      
+
       return insertedVotos;
     });
-    
+
     res.status(201).json({
       message: `${result.length} votos inseridos com sucesso`,
       data: result
@@ -403,15 +403,15 @@ router.post('/batch', async (req, res) => {
 router.get('/estatisticas', async (req, res) => {
   try {
     const { eleicao_id } = req.query;
-    
+
     let whereClause = '';
     let params = [];
-    
+
     if (eleicao_id) {
       whereClause = 'WHERE eleicao_id = $1';
       params.push(eleicao_id);
     }
-    
+
     const query = `
       SELECT 
         COUNT(*) as total_registros,
@@ -427,9 +427,9 @@ router.get('/estatisticas', async (req, res) => {
       FROM votos
       ${whereClause}
     `;
-    
+
     const result = await db.query(query, params);
-    
+
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Erro ao buscar estatísticas:', error);
@@ -441,15 +441,15 @@ router.get('/estatisticas', async (req, res) => {
 router.get('/estatisticas-por-cargo', async (req, res) => {
   try {
     const { eleicao_id } = req.query;
-    
+
     let whereClause = '';
     let params = [];
-    
+
     if (eleicao_id) {
       whereClause = 'WHERE v.eleicao_id = $1';
       params.push(eleicao_id);
     }
-    
+
     const query = `
       SELECT 
         c.cargo,
@@ -466,9 +466,9 @@ router.get('/estatisticas-por-cargo', async (req, res) => {
       GROUP BY c.cargo
       ORDER BY total_votos DESC
     `;
-    
+
     const result = await db.query(query, params);
-    
+
     res.json({
       cargos: result.rows,
       total_cargos: result.rows.length
@@ -482,7 +482,7 @@ router.get('/estatisticas-por-cargo', async (req, res) => {
 // GET /api/votos/tabela-agrupada - Tabela com agrupamento
 router.get('/tabela-agrupada', async (req, res) => {
   try {
-    const { 
+    const {
       eleicao_id,
       agrupar_por = 'candidato',
       cargo = '',
@@ -496,54 +496,54 @@ router.get('/tabela-agrupada', async (req, res) => {
       limite = 100,
       offset = 0
     } = req.query;
-    
+
     if (!eleicao_id) {
       return res.status(400).json({ error: 'eleicao_id é obrigatório' });
     }
-    
+
     // Construir WHERE clause
     let whereConditions = [`v.eleicao_id = $1`];
     let params = [eleicao_id];
     let paramCount = 1;
-    
+
     // Filtros básicos
     if (cargo) {
       whereConditions.push(`UPPER(c.cargo) = UPPER($${++paramCount})`);
       params.push(cargo);
     }
-    
+
     if (zona) {
       whereConditions.push(`v.zona = $${++paramCount}`);
       params.push(parseInt(zona));
     }
-    
+
     if (secao) {
       whereConditions.push(`v.secao = $${++paramCount}`);
       params.push(parseInt(secao));
     }
-    
+
     // Filtros de busca
     if (busca_candidato) {
       whereConditions.push(`c.nome ILIKE $${++paramCount}`);
       params.push(`%${busca_candidato}%`);
     }
-    
+
     if (busca_municipio) {
       whereConditions.push(`m.nome ILIKE $${++paramCount}`);
       params.push(`%${busca_municipio}%`);
     }
-    
-    
+
+
     if (busca_numero) {
       whereConditions.push(`c.numero::text ILIKE $${++paramCount}`);
       params.push(`%${busca_numero}%`);
     }
-    
+
     const whereClause = `WHERE ${whereConditions.join(' AND ')}`;
-    
+
     // Determinar campos e agrupamento
     let selectFields, groupByClause, orderByClause;
-    
+
     if (agrupar_por === 'candidato') {
       selectFields = `
         c.id as candidato_id,
@@ -584,25 +584,25 @@ router.get('/tabela-agrupada', async (req, res) => {
         COUNT(DISTINCT v.municipio_id) as municipios_envolvidos
       `;
       groupByClause = 'GROUP BY c.partido';
-           } else if (agrupar_por === 'zona') {
-             selectFields = `
+    } else if (agrupar_por === 'zona') {
+      selectFields = `
                v.zona,
                SUM(v.quantidade_votos) as total_votos,
                COUNT(*) as total_registros,
                COUNT(DISTINCT v.candidato_id) as candidatos_envolvidos,
                COUNT(DISTINCT v.municipio_id) as municipios_envolvidos
              `;
-             groupByClause = 'GROUP BY v.zona';
-           } else if (agrupar_por === 'partido') {
-             selectFields = `
+      groupByClause = 'GROUP BY v.zona';
+    } else if (agrupar_por === 'partido') {
+      selectFields = `
                c.partido,
                SUM(v.quantidade_votos) as total_votos,
                COUNT(*) as total_registros,
                COUNT(DISTINCT v.candidato_id) as candidatos_envolvidos,
                COUNT(DISTINCT v.municipio_id) as municipios_envolvidos
              `;
-             groupByClause = 'GROUP BY c.partido';
-           } else {
+      groupByClause = 'GROUP BY c.partido';
+    } else {
       // Nenhum agrupamento - dados detalhados
       selectFields = `
         v.*,
@@ -618,32 +618,50 @@ router.get('/tabela-agrupada', async (req, res) => {
       `;
       groupByClause = '';
     }
-    
+
+    // Validar compatibilidade entre agrupamento e ordenação
+    let realOrdenarPor = ordenar_por;
+
+    // Se agrupar por candidato, não pode ordenar por município
+    if (agrupar_por === 'candidato' && ordenar_por === 'municipio') {
+      realOrdenarPor = 'total_votos';
+    }
+
+    // Se agrupar por município, não pode ordenar por candidato
+    if (agrupar_por === 'municipio' && ordenar_por === 'candidato') {
+      realOrdenarPor = 'total_votos';
+    }
+
+    // Se agrupar por cargo, não pode ordenar por município nem candidato
+    if (agrupar_por === 'cargo' && (ordenar_por === 'municipio' || ordenar_por === 'candidato')) {
+      realOrdenarPor = 'total_votos';
+    }
+
     // Construir ORDER BY
     if (agrupar_por === 'nenhum') {
       // Para dados detalhados, usar campos específicos
-      const orderField = ordenar_por === 'votos' ? 'v.quantidade_votos' : 
-                        ordenar_por === 'municipio' ? 'm.nome' :
-                        ordenar_por === 'candidato' ? 'c.nome' :
-                        ordenar_por === 'cargo' ? 'c.cargo' :
-                        ordenar_por === 'partido' ? 'c.partido' :
-                        ordenar_por === 'zona' ? 'v.zona' :
-                        ordenar_por === 'secao' ? 'v.secao' :
-                        ordenar_por === 'numero' ? 'c.numero' :
-                        'v.quantidade_votos';
+      const orderField = realOrdenarPor === 'votos' ? 'v.quantidade_votos' :
+        realOrdenarPor === 'municipio' ? 'm.nome' :
+          realOrdenarPor === 'candidato' ? 'c.nome' :
+            realOrdenarPor === 'cargo' ? 'c.cargo' :
+              realOrdenarPor === 'partido' ? 'c.partido' :
+                realOrdenarPor === 'zona' ? 'v.zona' :
+                  realOrdenarPor === 'secao' ? 'v.secao' :
+                    realOrdenarPor === 'numero' ? 'c.numero' :
+                      'v.quantidade_votos';
       orderByClause = `ORDER BY ${orderField} ${ordem}`;
     } else {
       // Para dados agrupados, usar total_votos ou campo específico
-      const orderField = ordenar_por === 'votos' ? 'total_votos' :
-                        ordenar_por === 'municipio' ? 'municipio_nome' :
-                        ordenar_por === 'candidato' ? 'candidato_nome' :
-                        ordenar_por === 'cargo' ? 'cargo' :
-                        ordenar_por === 'partido' ? 'partido' :
-                        ordenar_por === 'zona' ? 'zona' :
-                        'total_votos';
+      const orderField = realOrdenarPor === 'votos' ? 'total_votos' :
+        realOrdenarPor === 'municipio' ? 'municipio_nome' :
+          realOrdenarPor === 'candidato' ? 'candidato_nome' :
+            realOrdenarPor === 'cargo' ? 'cargo' :
+              realOrdenarPor === 'partido' ? 'partido' :
+                realOrdenarPor === 'zona' ? 'zona' :
+                  'total_votos';
       orderByClause = `ORDER BY ${orderField} ${ordem}`;
     }
-    
+
     const query = `
       SELECT ${selectFields}
       FROM votos v
@@ -655,10 +673,10 @@ router.get('/tabela-agrupada', async (req, res) => {
       ${orderByClause}
       LIMIT $${++paramCount} OFFSET $${++paramCount}
     `;
-    
+
     params.push(parseInt(limite), parseInt(offset));
     const result = await db.query(query, params);
-    
+
     // Contar total de registros para paginação
     let countQuery;
     if (agrupar_por === 'nenhum') {
@@ -683,10 +701,10 @@ router.get('/tabela-agrupada', async (req, res) => {
         ) as count_table
       `;
     }
-    
+
     const countResult = await db.query(countQuery, params.slice(0, -2)); // Remove limite e offset
     const totalRegistros = parseInt(countResult.rows[0].count);
-    
+
     res.json({
       data: result.rows,
       agrupamento: agrupar_por,
@@ -710,11 +728,11 @@ router.get('/tabela-agrupada', async (req, res) => {
 router.get('/candidato/:id', async (req, res) => {
   try {
     const candidatoId = req.params.id;
-    
+
     if (!candidatoId || isNaN(candidatoId)) {
       return res.status(400).json({ error: 'ID do candidato inválido' });
     }
-    
+
     // Buscar votos do candidato agrupados por município
     const query = `
       SELECT 
@@ -730,13 +748,13 @@ router.get('/candidato/:id', async (req, res) => {
       GROUP BY m.id, m.nome, m.sigla_uf
       ORDER BY total_votos DESC
     `;
-    
+
     const result = await db.query(query, [candidatoId]);
-    
+
     // Calcular estatísticas gerais
     const totalVotos = result.rows.reduce((sum, row) => sum + parseInt(row.total_votos), 0);
     const totalMunicipios = result.rows.length;
-    
+
     res.json({
       success: true,
       candidato_id: candidatoId,

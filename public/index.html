@@ -75,29 +75,18 @@
                 <!-- Filtros de Busca -->
                 <div class="municipios-controls">
                     <div class="filters-section">
-                        <h3>Filtros de Busca</h3>
-                        <div class="filters-grid">
+                        <h3><i class="fas fa-filter"></i> Filtros de Busca</h3>
+                        <div class="municipios-controls-grid">
+                            <!-- Row 1 -->
                             <div class="control-group">
                                 <label for="municipios-eleicao">Eleição</label>
-                                <select id="municipios-eleicao">
+                                <select id="municipios-eleicao" class="form-select">
                                     <option value="">Todas as eleições</option>
                                 </select>
                             </div>
                             <div class="control-group">
-                                <label for="municipios-busca">Buscar Município</label>
-                                <div class="search-container">
-                                    <input type="text" id="municipios-busca" placeholder="Digite o nome do município..."
-                                        autocomplete="off">
-                                    <button class="btn btn-primary" onclick="buscarMunicipios()">
-                                        <i class="fas fa-search"></i>
-                                        Buscar
-                                    </button>
-                                </div>
-                                <small>Digite pelo menos 2 caracteres para iniciar a busca</small>
-                            </div>
-                            <div class="control-group">
                                 <label for="municipios-ordenar">Ordenar por</label>
-                                <select id="municipios-ordenar">
+                                <select id="municipios-ordenar" class="form-select">
                                     <option value="nome">Nome do Município</option>
                                     <option value="total_candidatos">Número de Candidatos</option>
                                     <option value="total_votos">Total de Votos</option>
@@ -106,10 +95,23 @@
                             </div>
                             <div class="control-group">
                                 <label for="municipios-ordem">Ordem</label>
-                                <select id="municipios-ordem">
+                                <select id="municipios-ordem" class="form-select">
                                     <option value="ASC">Crescente</option>
                                     <option value="DESC">Decrescente</option>
                                 </select>
+                            </div>
+
+                            <!-- Row 2 -->
+                            <div class="control-group full-width">
+                                <label for="municipios-busca">Buscar Município</label>
+                                <div class="search-input-group">
+                                    <input type="text" id="municipios-busca" class="form-control"
+                                        placeholder="Digite o nome do município..." autocomplete="off">
+                                    <button class="btn btn-primary" onclick="buscarMunicipios()">
+                                        <i class="fas fa-search"></i> Buscar
+                                    </button>
+                                </div>
+                                <small class="form-text">Digite pelo menos 2 caracteres para iniciar a busca</small>
                             </div>
                         </div>
                     </div>
@@ -666,6 +668,7 @@
                         <table class="data-table">
                             <thead id="candidatos-header">
                                 <tr>
+                                    <th>Foto</th>
                                     <th>Nome</th>
                                     <th>Número</th>
                                     <th>Cargo</th>
@@ -1016,11 +1019,25 @@
                         <table class="data-table ranking-table">
                             <thead>
                                 <tr>
-                                    <th>Regional</th>
-                                    <th>Municípios</th>
-                                    <th>Filiados (2024)</th>
-                                    <th>População</th>
-                                    <th>Taxa Filiação (por 1000)</th>
+                                    <th onclick="dashboard.ordenarComparativo('regional')" style="cursor: pointer;">
+                                        Regional <i class="fas fa-sort"></i>
+                                    </th>
+                                    <th onclick="dashboard.ordenarComparativo('total_municipios')"
+                                        style="cursor: pointer;" class="text-center">
+                                        Municípios <i class="fas fa-sort"></i>
+                                    </th>
+                                    <th onclick="dashboard.ordenarComparativo('total_filiados')"
+                                        style="cursor: pointer;" class="text-end">
+                                        Filiados (2024) <i class="fas fa-sort"></i>
+                                    </th>
+                                    <th onclick="dashboard.ordenarComparativo('total_populacao')"
+                                        style="cursor: pointer;" class="text-end">
+                                        População <i class="fas fa-sort"></i>
+                                    </th>
+                                    <th onclick="dashboard.ordenarComparativo('taxa_filiacao_por_mil')"
+                                        style="cursor: pointer;" class="text-end">
+                                        Taxa Filiação (por 1000) <i class="fas fa-sort-down"></i>
+                                    </th>
                                     <th>Performance</th>
                                 </tr>
                             </thead>

@@ -3,6 +3,11 @@
 
 const dashboard = {
     charts: {},
+    regionalData: [], // Armazenar dados para ordenação
+    currentSortComparativo: {
+        coluna: 'taxa_filiacao_por_mil',
+        ordem: 'desc'
+    },
 
     // Carregar todos os dados demográficos
     async carregarDemografico() {
@@ -31,6 +36,97 @@ const dashboard = {
         } catch (error) {
             console.error('❌ Erro ao carregar dashboard demográfico:', error);
         }
+    },
+
+    // Ordenar Tabela Comparativo
+    ordenarComparativo(coluna) {
+        // Toggle ordem se for a mesma coluna
+        if (this.currentSortComparativo.coluna === coluna) {
+            this.currentSortComparativo.ordem = this.currentSortComparativo.ordem === 'desc' ? 'asc' : 'desc';
+        } else {
+            this.currentSortComparativo.coluna = coluna;
+            this.currentSortComparativo.ordem = 'desc'; // Padrão desc
+
+            // Exceção: Regional (texto) padrão asc
+            if (coluna === 'regional') {
+                this.currentSortComparativo.ordem = 'asc';
+            }
+        }
+
+        // Atualizar ícones no header
+        this.atualizarIconesOrdenacao();
+
+        // Ordenar dados
+        const { coluna: col, ordem } = this.currentSortComparativo;
+
+        this.regionalData.sort((a, b) => {
+            let valA = a[col];
+            let valB = b[col];
+
+            // Tratar números
+            if (col !== 'regional') {
+                valA = parseFloat(valA) || 0;
+                valB = parseFloat(valB) || 0;
+            } else {
+                // Tratar texto
+                valA = (valA || '').toString().toLowerCase();
+                valB = (valB || '').toString().toLowerCase();
+            }
+
+            if (valA < valB) return ordem === 'asc' ? -1 : 1;
+            if (valA > valB) return ordem === 'asc' ? 1 : -1;
+            return 0;
+        });
+
+        this.renderizarComparativo(this.regionalData);
+    },
+
+    atualizarIconesOrdenacao() {
+        const headers = document.querySelectorAll('#regionais .ranking-table thead th');
+        headers.forEach(th => {
+            const icon = th.querySelector('i');
+            if (icon) {
+                icon.className = 'fas fa-sort'; // Reset
+
+                // Se for a coluna ativa
+                if (th.getAttribute('onclick')?.includes(this.currentSortComparativo.coluna)) {
+                    icon.className = this.currentSortComparativo.ordem === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down';
+                }
+            }
+        });
+    },
+
+    // Renderizar Tabela Comparativa (Extraído)
+    renderizarComparativo(dados) {
+        const tbodyComparativo = document.getElementById('regional-comparativo-body');
+        if (!tbodyComparativo) return;
+
+        const maxTaxa = Math.max(...dados.map(r => parseFloat(r.taxa_filiacao_por_mil) || 0));
+
+        tbodyComparativo.innerHTML = dados.map(item => {
+            const taxa = parseFloat(item.taxa_filiacao_por_mil) || 0;
+            const percentual = maxTaxa > 0 ? (taxa / maxTaxa) * 100 : 0;
+            let cor = '#e2e8f0';
+            if (taxa > 15) cor = '#10b981';
+            else if (taxa > 10) cor = '#3b82f6';
+            else if (taxa > 5) cor = '#f59e0b';
+            else cor = '#ef4444';
+
+            return `
+                <tr>
+                    <td class="fw-bold">${item.regional || 'Não Informado'}</td>
+                    <td class="text-center">${item.total_municipios}</td>
+                    <td class="text-end">${this.formatarNumero(item.total_filiados)}</td>
+                    <td class="text-end">${this.formatarNumero(item.total_populacao)}</td>
+                    <td class="text-end fw-bold">${taxa.toFixed(2)}</td>
+                    <td>
+                        <div class="progress-bar-container" style="background: #e2e8f0; border-radius: 4px; height: 8px; width: 100px;">
+                            <div style="width: ${percentual}%; height: 100%; background: ${cor}; border-radius: 4px;"></div>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
     },
 
     // Atualizar cards de estatísticas
@@ -361,32 +457,9 @@ const dashboard = {
 
             // Renderizar Comparativo
             if (comparativo.success && comparativo.comparativo_regionais) {
-                const maxTaxa = Math.max(...comparativo.comparativo_regionais.map(r => parseFloat(r.taxa_filiacao_por_mil) || 0));
-
-                tbodyComparativo.innerHTML = comparativo.comparativo_regionais.map(item => {
-                    const taxa = parseFloat(item.taxa_filiacao_por_mil) || 0;
-                    const percentual = (taxa / maxTaxa) * 100;
-                    let cor = '#e2e8f0';
-                    if (taxa > 15) cor = '#10b981';
-                    else if (taxa > 10) cor = '#3b82f6';
-                    else if (taxa > 5) cor = '#f59e0b';
-                    else cor = '#ef4444';
-
-                    return `
-                        <tr>
-                            <td class="fw-bold">${item.regional || 'Não Informado'}</td>
-                            <td class="text-center">${item.total_municipios}</td>
-                            <td class="text-end">${this.formatarNumero(item.total_filiados)}</td>
-                            <td class="text-end">${this.formatarNumero(item.total_populacao)}</td>
-                            <td class="text-end fw-bold">${taxa.toFixed(2)}</td>
-                            <td>
-                                <div class="progress-bar-container" style="background: #e2e8f0; border-radius: 4px; height: 8px; width: 100px;">
-                                    <div style="width: ${percentual}%; height: 100%; background: ${cor}; border-radius: 4px;"></div>
-                                </div>
-                            </td>
-                        </tr>
-                    `;
-                }).join('');
+                this.regionalData = comparativo.comparativo_regionais;
+                // Ordenar inicialmente (chama renderizar)
+                this.ordenarComparativo(this.currentSortComparativo.coluna);
             }
 
             // Renderizar Potencial

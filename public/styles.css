@@ -1267,11 +1267,18 @@ body {
 }
 
 .modal-close {
-    background: none;
+    background: transparent;
     border: none;
-    font-size: 1.5rem;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 2rem;
     cursor: pointer;
-    color: #666;
+    padding: 0.5rem;
+    line-height: 1;
+    transition: color 0.3s ease;
+}
+
+.modal-close:hover {
+    color: #fff;
 }
 
 .modal-body {
@@ -4285,6 +4292,7 @@ body {
         grid-template-columns: 1fr;
     }
 }
+
 /* Candidate Search Input in Dropdown */
 .params-search {
     padding: 0.5rem;
@@ -4309,4 +4317,32 @@ body {
     font-size: 0.8rem;
     color: #666;
     display: block;
+}
+
+/* Grid Layout para Busca de Municípios */
+.municipios-controls-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+    margin-top: 1rem;
+}
+
+.control-group.full-width {
+    grid-column: 1 / -1;
+}
+
+.search-input-group {
+    display: flex;
+    gap: 10px;
+}
+
+.search-input-group input {
+    flex: 1;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .municipios-controls-grid {
+        grid-template-columns: 1fr;
+    }
 }

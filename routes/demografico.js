@@ -300,7 +300,7 @@ router.get('/ranking-crescimento', async (req, res) => {
         GROUP BY cd_municipio, nm_municipio
       )
       SELECT 
-        COALESCE(d22.nm_municipio, d18.nm_municipio) as municipio,
+        m.nome as municipio,
         COALESCE(d18.total_2018, 0) as eleitores_2018,
         COALESCE(d22.total_2022, 0) as eleitores_2022,
         COALESCE(d22.total_2022, 0) - COALESCE(d18.total_2018, 0) as crescimento_absoluto,
@@ -311,6 +311,7 @@ router.get('/ranking-crescimento', async (req, res) => {
         END as crescimento_percentual
       FROM dados_2022 d22
       FULL OUTER JOIN dados_2018 d18 ON d22.cd_municipio = d18.cd_municipio
+      LEFT JOIN municipios m ON m.codigo::text = COALESCE(d22.cd_municipio, d18.cd_municipio)::text
       ORDER BY crescimento_absoluto DESC
       LIMIT 20
     `;
@@ -340,14 +341,15 @@ router.get('/mapa-tematico/:indicador', async (req, res) => {
         // Percentual com ensino superior por município
         query = `
           SELECT 
-            nm_municipio as municipio,
+            m.nome as municipio,
             cd_municipio,
             SUM(CASE WHEN ds_grau_escolaridade ILIKE '%SUPERIOR%' THEN qt_eleitores_perfil ELSE 0 END) * 100.0 / 
               NULLIF(SUM(qt_eleitores_perfil), 0) as valor,
             SUM(qt_eleitores_perfil) as total_eleitores
           FROM perfil_eleitor_secao
+          LEFT JOIN municipios m ON m.codigo::text = cd_municipio::text
           ${ano_eleicao ? 'WHERE ano_eleicao = $1' : ''}
-          GROUP BY nm_municipio, cd_municipio
+          GROUP BY m.nome, cd_municipio
           ORDER BY valor DESC
         `;
         break;
@@ -356,7 +358,7 @@ router.get('/mapa-tematico/:indicador', async (req, res) => {
         // Percentual de jovens (16-24 anos) por município
         query = `
           SELECT 
-            nm_municipio as municipio,
+            m.nome as municipio,
             cd_municipio,
             SUM(CASE WHEN ds_faixa_etaria ILIKE '%16%' OR ds_faixa_etaria ILIKE '%17%' 
                       OR ds_faixa_etaria ILIKE '%18%' OR ds_faixa_etaria ILIKE '%19%' 
@@ -365,8 +367,9 @@ router.get('/mapa-tematico/:indicador', async (req, res) => {
               NULLIF(SUM(qt_eleitores_perfil), 0) as valor,
             SUM(qt_eleitores_perfil) as total_eleitores
           FROM perfil_eleitor_secao
+          LEFT JOIN municipios m ON m.codigo::text = cd_municipio::text
           ${ano_eleicao ? 'WHERE ano_eleicao = $1' : ''}
-          GROUP BY nm_municipio, cd_municipio
+          GROUP BY m.nome, cd_municipio
           ORDER BY valor DESC
         `;
         break;
@@ -375,7 +378,7 @@ router.get('/mapa-tematico/:indicador', async (req, res) => {
         // Percentual de idosos (60+) por município
         query = `
           SELECT 
-            nm_municipio as municipio,
+            m.nome as municipio,
             cd_municipio,
             SUM(CASE WHEN ds_faixa_etaria ILIKE '%60%' OR ds_faixa_etaria ILIKE '%65%' 
                       OR ds_faixa_etaria ILIKE '%70%' OR ds_faixa_etaria ILIKE '%75%'
@@ -384,8 +387,9 @@ router.get('/mapa-tematico/:indicador', async (req, res) => {
               NULLIF(SUM(qt_eleitores_perfil), 0) as valor,
             SUM(qt_eleitores_perfil) as total_eleitores
           FROM perfil_eleitor_secao
+          LEFT JOIN municipios m ON m.codigo::text = cd_municipio::text
           ${ano_eleicao ? 'WHERE ano_eleicao = $1' : ''}
-          GROUP BY nm_municipio, cd_municipio
+          GROUP BY m.nome, cd_municipio
           ORDER BY valor DESC
         `;
         break;
@@ -394,14 +398,15 @@ router.get('/mapa-tematico/:indicador', async (req, res) => {
         // Percentual de mulheres por município
         query = `
           SELECT 
-            nm_municipio as municipio,
+            m.nome as municipio,
             cd_municipio,
             SUM(CASE WHEN ds_genero = 'FEMININO' THEN qt_eleitores_perfil ELSE 0 END) * 100.0 / 
               NULLIF(SUM(qt_eleitores_perfil), 0) as valor,
             SUM(qt_eleitores_perfil) as total_eleitores
           FROM perfil_eleitor_secao
+          LEFT JOIN municipios m ON m.codigo::text = cd_municipio::text
           ${ano_eleicao ? 'WHERE ano_eleicao = $1' : ''}
-          GROUP BY nm_municipio, cd_municipio
+          GROUP BY m.nome, cd_municipio
           ORDER BY valor DESC
         `;
         break;

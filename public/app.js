@@ -1310,7 +1310,24 @@ class SistemaEleitoral {
             <tr>
                 ${colunas.map(col => {
             const campo = colunasParaExibir[colunas.indexOf(col)];
-            const valor = this.formatarValor(row[campo], col);
+            let rawValue = row[campo];
+
+            // Tratamento para colunas irrelevantes no agrupamento
+            if (agruparPor === 'candidato' && ['municipio', 'zona', 'secao', 'local', 'endereco'].includes(col)) {
+                return `<td class="text-muted text-center" title="Dados agrupados por candidato">-</td>`;
+            }
+            if (agruparPor === 'municipio' && ['candidato', 'numero', 'partido', 'cargo', 'zona', 'secao', 'local', 'endereco'].includes(col)) {
+                if (col === 'candidato') return `<td class="text-muted text-center">${row.candidatos_envolvidos || 0} envolvidos</td>`;
+                if (col === 'cargo') return `<td class="text-muted text-center">Vários</td>`;
+                return `<td class="text-muted text-center" title="Dados agrupados por município">-</td>`;
+            }
+            if (agruparPor === 'cargo' && ['candidato', 'numero', 'partido', 'municipio', 'zona', 'secao'].includes(col)) {
+                if (col === 'candidato') return `<td class="text-muted text-center">${row.candidatos_envolvidos || 0} envolvidos</td>`;
+                if (col === 'municipio') return `<td class="text-muted text-center">${row.municipios_envolvidos || 0} envolvidos</td>`;
+                return `<td class="text-muted text-center">-</td>`;
+            }
+
+            const valor = this.formatarValor(rawValue, col);
 
             // Se for coluna de candidato e tiver ID, criar link
             if (col === 'candidato' && row.candidato_id) {
@@ -3567,8 +3584,14 @@ class SistemaEleitoral {
                 ? candidato.nome_urna
                 : candidato.nome || 'N/A';
 
+            const hasFoto = candidato.foto && typeof candidato.foto === 'string' && candidato.foto.length > 3 && candidato.foto !== 'null' && candidato.foto !== 'undefined';
+            const fotoUrl = hasFoto ? `/fotos_candidatos/${candidato.foto}` : 'assets/img/sem-foto.png';
+
             return `
             <tr>
+                <td>
+                    <img src="${fotoUrl}" loading="lazy" style="width:40px;height:40px;border-radius:50%;object-fit:cover;" onerror="this.onerror=null;this.src='assets/img/sem-foto.png'">
+                </td>
                 <td>
                     <a href="perfil-candidato.html?id=${candidato.id}" class="candidato-link">
                         ${nomeExibir}
@@ -4043,6 +4066,13 @@ class SistemaEleitoral {
 
         // Configurar event listeners do modal
         this.configurarEventListenersModal();
+
+        // Fechar ao clicar fora do modal
+        window.onclick = (event) => {
+            if (event.target == modal) {
+                this.fecharModalMunicipio();
+            }
+        }
 
         modal.style.display = 'block';
     }
