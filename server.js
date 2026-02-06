@@ -86,6 +86,7 @@ app.use('/api/fotos-candidatos', fotosCandidatosRoutes);
 app.use('/api/ranking', require('./routes/ranking'));
 app.use('/api/demografico', demograficoRoutes);
 app.use('/api/correlacao-regional', correlacaoRegionalRoutes);
+app.use('/api/inteligencia', require('./routes/inteligencia'));
 
 // Rota principal - servir a aplicação web
 app.get('/', (req, res) => {

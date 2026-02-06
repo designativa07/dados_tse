@@ -9,7 +9,7 @@
         href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗳️</text></svg>">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css?v=3">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
@@ -51,6 +51,10 @@
                     <button class="nav-btn" data-tab="ranking">
                         <i class="fas fa-medal"></i>
                         Ranking
+                    </button>
+                    <button class="nav-btn" data-tab="inteligencia">
+                        <i class="fas fa-brain"></i>
+                        Inteligência
                     </button>
                     <button class="nav-btn" data-tab="upload">
                         <i class="fas fa-upload"></i>
@@ -1260,6 +1264,61 @@
                 </div>
             </div>
 
+
+            <!-- Aba de Inteligência Estratégica -->
+            <div id="inteligencia" class="tab-content">
+                <div class="header-section">
+                    <h2><i class="fas fa-brain"></i> Inteligência Eleitoral</h2>
+                    <p>Ferramentas avançadas para análise estratégica e planejamento de campanha.</p>
+                </div>
+
+                <div class="inteligencia-grid">
+                    <!-- Mapa de Oportunidades -->
+                    <div class="card card-inteligencia"
+                        onclick="dashboardInteligencia.abrirFerramenta('oportunidades')">
+                        <div class="card-icon"><i class="fas fa-search-location"></i></div>
+                        <h3>Mapa de Oportunidades</h3>
+                        <p>Encontre cidades com perfil ideal mas baixa votação.</p>
+                    </div>
+
+                    <!-- Cidades Gêmeas -->
+                    <div class="card card-inteligencia" onclick="dashboardInteligencia.abrirFerramenta('gemeas')">
+                        <div class="card-icon"><i class="fas fa-city"></i></div>
+                        <h3>Cidades Gêmeas</h3>
+                        <p>Descubra municípios com perfil idêntico aos seus redutos.</p>
+                    </div>
+
+                    <!-- Ranking de Eficiência -->
+                    <div class="card card-inteligencia" onclick="dashboardInteligencia.abrirFerramenta('eficiencia')">
+                        <div class="card-icon"><i class="fas fa-chart-line"></i></div>
+                        <h3>Ranking de Eficiência</h3>
+                        <p>Análise de custo por voto e retorno sobre investimento.</p>
+                    </div>
+
+                    <!-- Simulador de Metas -->
+                    <div class="card card-inteligencia" onclick="dashboardInteligencia.abrirFerramenta('metas')">
+                        <div class="card-icon"><i class="fas fa-bullseye"></i></div>
+                        <h3>Simulador de Metas</h3>
+                        <p>Projeção e distribuição inteligente de metas de votos.</p>
+                    </div>
+
+                    <!-- Matriz de Migração -->
+                    <div class="card card-inteligencia" onclick="dashboardInteligencia.abrirFerramenta('migracao')">
+                        <div class="card-icon"><i class="fas fa-exchange-alt"></i></div>
+                        <h3>Matriz de Migração</h3>
+                        <p>Compare o desempenho entre eleições (2018 vs 2022).</p>
+                    </div>
+                </div>
+
+                <!-- Container para as ferramentas -->
+                <div id="ferramenta-container" class="mt-4" style="display: none;">
+                    <button class="btn btn-secondary mb-3" onclick="dashboardInteligencia.fecharFerramenta()">
+                        <i class="fas fa-arrow-left"></i> Voltar ao Menu
+                    </button>
+                    <div id="ferramenta-conteudo"></div>
+                </div>
+            </div>
+
         </div>
     </main>
 
@@ -1376,8 +1435,9 @@
             }, 1500);
         }
     </script>
-    <script src="ranking.js"></script>
-    <script src="dashboard-demografico.js"></script>
+    <script src="ranking.js?v=2"></script>
+    <script src="dashboard-demografico.js?v=2"></script>
+    <script src="dashboard-inteligencia.js?v=4"></script>
 </body>
 
 </html>
