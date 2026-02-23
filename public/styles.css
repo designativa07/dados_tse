@@ -53,7 +53,8 @@ body {
     gap: 0.5rem;
 }
 
-.nav-btn {
+.nav-btn,
+.nav-link-btn {
     background: rgba(255, 255, 255, 0.1);
     border: none;
     color: white;
@@ -65,9 +66,11 @@ body {
     align-items: center;
     gap: 0.5rem;
     font-size: 0.9rem;
+    text-decoration: none;
 }
 
-.nav-btn:hover {
+.nav-btn:hover,
+.nav-link-btn:hover {
     background: rgba(255, 255, 255, 0.2);
     transform: translateY(-2px);
 }
@@ -75,6 +78,16 @@ body {
 .nav-btn.active {
     background: rgba(255, 255, 255, 0.3);
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.premium-nav-btn {
+    border: 1px solid rgba(251, 191, 36, 0.5) !important;
+    background: rgba(251, 191, 36, 0.1) !important;
+}
+
+.premium-nav-btn:hover {
+    background: rgba(251, 191, 36, 0.2) !important;
+    border-color: rgba(251, 191, 36, 0.8) !important;
 }
 
 /* Main Content */
@@ -4385,6 +4398,39 @@ body {
     color: #64748b;
     font-size: 0.9rem;
     line-height: 1.5;
+}
+
+.card-inteligencia.highlight-premium {
+    background: linear-gradient(135deg, #fffcf0 0%, #f5f3ff 100%);
+    border: 2px solid #fbbf24;
+    position: relative;
+    overflow: hidden;
+}
+
+.card-inteligencia.highlight-premium::after {
+    content: 'PREMIUM';
+    position: absolute;
+    top: 10px;
+    right: -25px;
+    background: #fbbf24;
+    color: #000;
+    font-size: 10px;
+    font-weight: bold;
+    padding: 2px 30px;
+    transform: rotate(45deg);
+}
+
+.card-inteligencia.highlight-premium:hover {
+    border-color: #f59e0b;
+    box-shadow: 0 10px 20px -3px rgba(245, 158, 11, 0.2);
+}
+
+.card-inteligencia.highlight-premium .card-icon {
+    color: #f59e0b;
+}
+
+.card-inteligencia.highlight-premium h3 {
+    color: #92400e;
 }
 
 /* ====================================
