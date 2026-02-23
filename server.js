@@ -19,6 +19,7 @@ const regionaisRoutes = require('./routes/regionais');
 const fotosCandidatosRoutes = require('./routes/fotos-candidatos');
 const demograficoRoutes = require('./routes/demografico');
 const correlacaoRegionalRoutes = require('./routes/correlacao-regional');
+const chatThesysRoutes = require('./routes/chat-thesys');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -28,12 +29,12 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://unpkg.com", "https://cdnjs.cloudflare.com", "https://cdn.jsdelivr.net"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://unpkg.com", "https://cdnjs.cloudflare.com", "https://cdn.jsdelivr.net", "https://fonts.googleapis.com"],
       scriptSrc: ["'self'", "'unsafe-inline'", "https://unpkg.com", "https://cdnjs.cloudflare.com", "https://cdn.jsdelivr.net"],
       scriptSrcAttr: ["'unsafe-inline'"],
       imgSrc: ["'self'", "data:", "https:"],
       connectSrc: ["'self'", "https://unpkg.com", "https://cdnjs.cloudflare.com", "https://cdn.jsdelivr.net"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com", "https://fonts.googleapis.com", "https:", "data:"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com", "https://fonts.googleapis.com", "data:"],
       objectSrc: ["'none'"],
       mediaSrc: ["'self'"],
       frameSrc: ["'none'"],
@@ -87,10 +88,16 @@ app.use('/api/ranking', require('./routes/ranking'));
 app.use('/api/demografico', demograficoRoutes);
 app.use('/api/correlacao-regional', correlacaoRegionalRoutes);
 app.use('/api/inteligencia', require('./routes/inteligencia'));
+app.use('/api/chat-tse-thesys', chatThesysRoutes);
 
 // Rota principal - servir a aplicação web
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Rota para o chat de inteligência com Thesys C1
+app.get('/chat-inteligencia', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'chat-inteligencia.html'));
 });
 
 // Rota de health check
