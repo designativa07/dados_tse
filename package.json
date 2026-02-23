@@ -22,6 +22,7 @@
   "author": "Sistema de Análise Eleitoral",
   "license": "MIT",
   "dependencies": {
+    "all": "^0.0.0",
     "cors": "^2.8.5",
     "csv-parser": "^3.2.0",
     "dotenv": "^16.3.1",

@@ -967,7 +967,21 @@
 
             <!-- Seção de Votos por Mesorregião - Fora do grid para ocupar toda a largura -->
             <div class="perfil-card votos-mesorregiao-full-width">
-                <h3>🗺️ Votos por Mesorregião</h3>
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
+                    <h3 style="margin-bottom: 0;">🗺️ Votos por Mesorregião</h3>
+                    <div class="btn-group" role="group" aria-label="Exportar votos por mesorregião">
+                        <button type="button"
+                                class="btn btn-success btn-sm"
+                                id="btn-exportar-votos-mesorregiao-excel">
+                            <i class="fas fa-file-excel me-1"></i> Exportar Excel
+                        </button>
+                        <button type="button"
+                                class="btn btn-danger btn-sm"
+                                id="btn-exportar-votos-mesorregiao-pdf">
+                            <i class="fas fa-file-pdf me-1"></i> Exportar PDF
+                        </button>
+                    </div>
+                </div>
                 <div id="votos-mesorregiao">
                     <!-- Votos por mesorregião serão inseridos aqui -->
                 </div>
@@ -1034,6 +1048,11 @@
             </div>
         </div>
     </div>
+
+    <!-- Bibliotecas para exportação (Excel/PDF) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
 
     <script>
         // Função global para voltar
@@ -2440,7 +2459,7 @@
                 </div>
                 
                 <div class="votos-mesorregiao-container">
-                    <table class="mesorregiao-table">
+                    <table class="mesorregiao-table" id="tabela-votos-mesorregiao">
                         <thead>
                             <tr>
                                 <th>Mesorregião</th>
@@ -2515,6 +2534,197 @@
                         });
                     });
                 }, 100);
+
+                // Ligações dos botões de exportação (inclui municípios, via API)
+                const btnExcel = document.getElementById('btn-exportar-votos-mesorregiao-excel');
+                const btnPDF = document.getElementById('btn-exportar-votos-mesorregiao-pdf');
+
+                function getCandidatoIdFromUrl() {
+                    const urlParams = new URLSearchParams(window.location.search);
+                    return urlParams.get('id');
+                }
+
+                async function carregarMunicipiosParaExportacao(candidatoId, mesorregioes) {
+                    const tarefas = mesorregioes.map(async (m) => {
+                        const mesorregiaoId = m.mesorregiao_id;
+                        try {
+                            const resp = await fetch(`/api/regionais/votos-por-municipio/${candidatoId}/${mesorregiaoId}`);
+                            const json = await resp.json();
+                            if (json && json.success && Array.isArray(json.data)) {
+                                return { mesorregiao: m, municipios: json.data };
+                            }
+                            return { mesorregiao: m, municipios: [] };
+                        } catch (error) {
+                            console.error('Erro ao buscar municípios para exportação:', mesorregiaoId, error);
+                            return { mesorregiao: m, municipios: [] };
+                        }
+                    });
+
+                    return Promise.all(tarefas);
+                }
+
+                function buildDadosMesorregioes(mesorregioes) {
+                    return mesorregioes.map(m => ({
+                        'Mesorregião': m.mesorregiao,
+                        'Votos': parseInt(m.total_votos) || 0,
+                        'Municípios com votos': parseInt(m.municipios_com_votos) || 0,
+                        'Total de municípios': parseInt(m.total_municipios_regiao) || 0,
+                        '% Atendidos': parseFloat(m.percentual_municipios_atendidos) || 0
+                    }));
+                }
+
+                function buildDadosMunicipios(resultados) {
+                    const linhas = [];
+
+                    resultados.forEach(({ mesorregiao, municipios }) => {
+                        const totalVotosMeso = (municipios || []).reduce((sum, mm) => sum + (parseInt(mm.total_votos) || 0), 0);
+                        (municipios || [])
+                            .slice()
+                            .sort((a, b) => (parseInt(b.total_votos) || 0) - (parseInt(a.total_votos) || 0))
+                            .forEach((mm, idx) => {
+                                const votos = parseInt(mm.total_votos) || 0;
+                                const eleitores = parseInt(mm.eleitores_2024) || 0;
+                                const percentualEleitores = parseFloat(mm.percentual_eleitores) || 0;
+                                const percentualTotal = totalVotosMeso > 0 ? (votos / totalVotosMeso) * 100 : 0;
+
+                                linhas.push({
+                                    'Mesorregião': mesorregiao.mesorregiao,
+                                    'Posição': idx + 1,
+                                    'Município': mm.municipio,
+                                    'Votos': votos,
+                                    '% do Total (mesorregião)': parseFloat(percentualTotal.toFixed(1)),
+                                    '% Eleitores': percentualEleitores,
+                                    'Eleitores': eleitores
+                                });
+                            });
+                    });
+
+                    return linhas;
+                }
+
+                if (btnExcel) {
+                    btnExcel.onclick = async function () {
+                        const originalText = btnExcel.innerHTML;
+                        btnExcel.disabled = true;
+                        btnExcel.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Exportando...';
+
+                        try {
+                            const candidatoId = getCandidatoIdFromUrl();
+                            if (!candidatoId) {
+                                alert('ID do candidato não encontrado.');
+                                return;
+                            }
+
+                            if (!Array.isArray(mesorregioes) || mesorregioes.length === 0) {
+                                alert('Nenhum dado para exportar.');
+                                return;
+                            }
+
+                            const dadosMeso = buildDadosMesorregioes(mesorregioes);
+                            const resultadosMunicipios = await carregarMunicipiosParaExportacao(candidatoId, mesorregioes);
+                            const dadosMun = buildDadosMunicipios(resultadosMunicipios);
+
+                            const wb = XLSX.utils.book_new();
+                            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(dadosMeso), 'Mesorregiões');
+                            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(dadosMun), 'Municípios');
+
+                            const nome = (candidato && candidato.nome) ? candidato.nome.replace(/\s+/g, '_') : 'candidato';
+                            const dataHoje = new Date().toISOString().split('T')[0];
+                            const nomeArquivo = `votos_mesorregiao_${nome}_${dataHoje}.xlsx`;
+
+                            XLSX.writeFile(wb, nomeArquivo);
+                        } catch (error) {
+                            console.error('Erro ao exportar Excel de votos por mesorregião:', error);
+                            alert('Erro ao exportar Excel: ' + error.message);
+                        } finally {
+                            btnExcel.disabled = false;
+                            btnExcel.innerHTML = originalText;
+                        }
+                    };
+                }
+
+                if (btnPDF) {
+                    btnPDF.onclick = async function () {
+                        const originalText = btnPDF.innerHTML;
+                        btnPDF.disabled = true;
+                        btnPDF.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Exportando...';
+
+                        try {
+                            const candidatoId = getCandidatoIdFromUrl();
+                            if (!candidatoId) {
+                                alert('ID do candidato não encontrado.');
+                                return;
+                            }
+
+                            if (!Array.isArray(mesorregioes) || mesorregioes.length === 0) {
+                                alert('Nenhum dado para exportar.');
+                                return;
+                            }
+
+                            const { jsPDF } = window.jspdf;
+                            const doc = new jsPDF('landscape', 'mm', 'a4');
+
+                            const titulo = `Votos por Mesorregião (com municípios) - ${candidato && candidato.nome ? candidato.nome : 'Candidato'}`;
+                            const data = new Date().toLocaleDateString('pt-BR');
+
+                            doc.setFontSize(16);
+                            doc.text('Sistema de Análise Eleitoral TSE', 14, 10);
+                            doc.setFontSize(12);
+                            doc.text(titulo, 14, 18);
+                            doc.text(`Data: ${data}`, 14, 24);
+
+                            const dadosMeso = buildDadosMesorregioes(mesorregioes).map(d => ([
+                                d['Mesorregião'],
+                                (d['Votos'] || 0).toLocaleString('pt-BR'),
+                                `${d['Municípios com votos']}/${d['Total de municípios']}`,
+                                (d['% Atendidos'] || 0) + '%'
+                            ]));
+
+                            doc.autoTable({
+                                startY: 30,
+                                head: [['Mesorregião', 'Votos', 'Municípios', '% Atendidos']],
+                                body: dadosMeso,
+                                styles: { fontSize: 8 },
+                                headStyles: { fillColor: [52, 73, 94] }
+                            });
+
+                            const resultadosMunicipios = await carregarMunicipiosParaExportacao(candidatoId, mesorregioes);
+                            const dadosMun = buildDadosMunicipios(resultadosMunicipios).map(d => ([
+                                d['Mesorregião'],
+                                d['Posição'],
+                                d['Município'],
+                                (d['Votos'] || 0).toLocaleString('pt-BR'),
+                                (d['% do Total (mesorregião)'] ?? '').toString() + '%',
+                                (d['% Eleitores'] ?? '').toString() + '%',
+                                (d['Eleitores'] || 0).toLocaleString('pt-BR')
+                            ]));
+
+                            doc.addPage();
+                            doc.setFontSize(12);
+                            doc.text('Municípios por Mesorregião', 14, 14);
+
+                            doc.autoTable({
+                                startY: 18,
+                                head: [['Mesorregião', '#', 'Município', 'Votos', '% do Total', '% Eleitores', 'Eleitores']],
+                                body: dadosMun,
+                                styles: { fontSize: 7 },
+                                headStyles: { fillColor: [52, 73, 94] }
+                            });
+
+                            const nome = (candidato && candidato.nome) ? candidato.nome.replace(/\s+/g, '_') : 'candidato';
+                            const dataHoje = new Date().toISOString().split('T')[0];
+                            const nomeArquivo = `votos_mesorregiao_${nome}_${dataHoje}.pdf`;
+
+                            doc.save(nomeArquivo);
+                        } catch (error) {
+                            console.error('Erro ao exportar PDF de votos por mesorregião:', error);
+                            alert('Erro ao exportar PDF: ' + error.message);
+                        } finally {
+                            btnPDF.disabled = false;
+                            btnPDF.innerHTML = originalText;
+                        }
+                    };
+                }
             }
 
             function preencherRankings(candidato) {
