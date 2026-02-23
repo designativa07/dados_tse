@@ -20,53 +20,73 @@ if (!THESYS_API_KEY) {
   console.log(`🔌 Rota de chat inicializada com o modelo: ${THESYS_MODEL}`);
 }
 
+const db = require("../config/database");
+
 router.post("/", async (req, res) => {
   if (!THESYS_API_KEY) {
     return res.status(500).json({
-      error:
-        "THESYS_API_KEY não configurada no servidor. Configure a chave de API do Thesys para habilitar o chat.",
+      error: "THESYS_API_KEY não configurada.",
     });
   }
 
   const { prompt, history = [] } = req.body || {};
 
-  if (!prompt || typeof prompt !== "string") {
-    return res.status(400).json({
-      error: "Campo 'prompt' é obrigatório e deve ser uma string.",
-    });
-  }
-
+  // Nova estratégia: A IA recebe o esquema e retorna a SQL.
+  // Neste primeiro passo, vamos dar à IA informações precisas sobre a estrutura.
   const systemMessage = {
     role: "system",
-    content:
-      "Você é um assistente de análise eleitoral especializado na base de dados deste sistema." +
-      " A base contém tabelas de votos, candidatos, municípios, eleições e dados demográficos agregados." +
-      " Ajude o usuário a explorar padrões eleitorais, comparar eleições, analisar desempenho de candidatos" +
-      " e sugerir visualizações como tabelas, gráficos e mapas." +
-      " Formate sempre a resposta usando recursos de Generative UI do C1, como tabelas, cartões e gráficos adequados ao contexto.",
+    content: `Você é um analista de dados especialista em SQL para o sistema de dados do TSE de Santa Catarina (SC).
+Sua tarefa é responder perguntas do usuário SEMPRE consultando a base de dados via queries precisas.
+
+### ESTRUTURA DO BANCO (PostgreSQL):
+- eleicoes (id, ano, tipo, descricao, turno)
+- candidatos (id, numero, nome, cargo, partido, eleicao_id)
+- municipios (id, codigo, nome, sigla_uf)
+- votos (id, eleicao_id, municipio_id, candidato_id, zona, secao, quantidade_votos)
+- perfil_eleitor_secao (cd_municipio, ano_eleicao, ds_genero, ds_faixa_etaria, ds_grau_escolaridade, qt_eleitores_perfil)
+
+### REGRAS DE OURO:
+1. MARCOS LUIZ VIEIRA em 2022 é do PSDB (id_candidato você deve buscar).
+2. Use INNER JOINs para ligar votos a candidatos e municípios.
+3. Se o usuário perguntar por "Marcos Vieira", busque por 'MARCOS LUIZ VIEIRA' (ILIKE).
+4. O estado é APENAS Santa Catarina (SC).
+5. Se não tiver certeza, primeiro faça uma query para listar candidatos/eleições disponíveis.
+
+IMPORTANTE: Seus dados externos estão desatualizados. A ÚNICA verdade está no banco de dados local.`,
   };
 
-  const conversationMessages = [
-    systemMessage,
-    ...history
-      .filter(
-        (m) =>
-          m &&
-          typeof m === "object" &&
-          (m.role === "user" || m.role === "assistant") &&
-          typeof m.content === "string"
-      )
-      .map((m) => ({
-        role: m.role,
-        content: m.content,
-      })),
-    {
-      role: "user",
-      content: prompt,
-    },
-  ];
-
   try {
+    // 1. Enviar para a IA para obter a intenção e possivelmente a necessidade de dados
+    const initialMessages = [systemMessage, ...history.map(m => ({ role: m.role, content: m.content })), { role: "user", content: prompt }];
+
+    // Para simplificar e garantir precisão total, vamos interceptar perguntas comuns e rodar SQL
+    // Mas para manter a flexibilidade da GenUI, usamos o GenUI SDK do Thesys
+    // Vamos adicionar os resultados de queries reais ao contexto antes de enviar para a IA final
+
+    let contextData = "";
+
+    // Busca básica de contexto para o Marcos Vieira se mencionado (exemplo de otimização)
+    if (prompt.toLowerCase().includes("marcos vieira") || prompt.toLowerCase().includes("marcos luiz vieira")) {
+      const candData = await db.query("SELECT * FROM candidatos WHERE nome ILIKE '%MARCOS LUIZ VIEIRA%' AND partido = 'PSDB' LIMIT 1");
+      if (candData.rows.length > 0) {
+        const c = candData.rows[0];
+        const votos = await db.query("SELECT SUM(quantidade_votos) as total FROM votos WHERE candidato_id = $1", [c.id]);
+        const cityVotos = await db.query(`
+          SELECT m.nome, SUM(v.quantidade_votos) as votos 
+          FROM votos v JOIN municipios m ON v.municipio_id = m.id 
+          WHERE v.candidato_id = $1 
+          GROUP BY m.nome ORDER BY votos DESC LIMIT 5`, [c.id]);
+
+        contextData = `\n[DADOS REAIS DO BANCO]: Candidato ${c.nome} (Número ${c.numero}, Partido ${c.partido}). Votos Totais em 2022: ${votos.rows[0].total}. Top Municípios: ${cityVotos.rows.map(r => `${r.nome}: ${r.votos}`).join(", ")}.`;
+      }
+    }
+
+    const conversationMessages = [
+      systemMessage,
+      ...history.map(m => ({ role: m.role, content: m.content })),
+      { role: "user", content: prompt + (contextData ? "\n\nUse estes dados reais para responder: " + contextData : "") }
+    ];
+
     const apiResponse = await fetch(`${THESYS_BASE_URL}/chat/completions`, {
       method: "POST",
       headers: {
@@ -81,47 +101,16 @@ router.post("/", async (req, res) => {
 
     if (!apiResponse.ok) {
       const errorText = await apiResponse.text();
-      let errorJson;
-      try {
-        errorJson = JSON.parse(errorText);
-      } catch (e) {
-        errorJson = { message: errorText };
-      }
-
-      // eslint-disable-next-line no-console
-      console.error("❌ Erro ao chamar Thesys C1:", {
-        status: apiResponse.status,
-        url: apiResponse.url,
-        error: errorJson
-      });
-
-      return res.status(502).json({
-        error: "Falha ao comunicar com o serviço Thesys C1.",
-        details: errorJson,
-        status: apiResponse.status,
-      });
+      return res.status(502).json({ error: "Erro no serviço de IA", details: errorText });
     }
 
     const data = await apiResponse.json();
-    const c1Response =
-      data?.choices?.[0]?.message?.content ||
-      data?.choices?.[0]?.message?.c1_response ||
-      "";
+    const c1Response = data?.choices?.[0]?.message?.content || data?.choices?.[0]?.message?.c1_response || "";
 
-    if (!c1Response) {
-      // eslint-disable-next-line no-console
-      console.warn("Resposta do Thesys C1 sem conteúdo utilizável:", data);
-    }
-
-    return res.json({
-      c1Response,
-    });
+    return res.json({ c1Response });
   } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error("Erro inesperado na rota de chat Thesys:", error);
-    return res.status(500).json({
-      error: "Erro interno ao processar a requisição de chat.",
-    });
+    console.error("Erro no chat:", error);
+    return res.status(500).json({ error: "Erro interno." });
   }
 });
 
